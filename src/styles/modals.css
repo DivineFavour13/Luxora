@@ -1,0 +1,226 @@
+/* =============== MODAL STYLES =============== */
+/* Uses CSS variables from style.css */
+
+.quick-view-modal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.8);
+  display: none;
+  justify-content: center;
+  align-items: center;
+  z-index: 1300; /* Updated: Consistent z-index scale */
+}
+
+.modal-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.modal-content {
+  background: var(--bg-primary);
+  border-radius: 12px;
+  max-width: 800px;
+  max-height: 90vh;
+  overflow-y: auto;
+  position: relative;
+  margin: 20px;
+  animation: modalFadeIn 0.3s ease-out;
+}
+
+.modal-close {
+  position: absolute;
+  top: 15px;
+  right: 15px;
+  background: rgba(0, 0, 0, 0.1);
+  border: none;
+  border-radius: 50%;
+  width: 35px;
+  height: 35px;
+  cursor: pointer;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.3s ease;
+}
+
+.modal-close:hover {
+  background: rgba(0, 0, 0, 0.2);
+}
+
+.modal-body {
+  display: flex;
+  gap: 2rem;
+  padding: 2rem;
+}
+
+.modal-body .product-image {
+  flex: 1;
+  max-width: 300px;
+}
+
+.modal-body .product-image img {
+  width: 100%;
+  height: auto;
+  border-radius: 8px;
+}
+
+.modal-body .product-details {
+  flex: 1;
+}
+
+.modal-body .product-details h2 {
+  color: var(--text-primary);
+  margin-bottom: 1rem;
+  font-size: 1.5rem;
+}
+
+.modal-body .product-rating {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+.modal-body .stars {
+  color: var(--warning-color);
+}
+
+.modal-body .product-price {
+  margin-bottom: 1rem;
+}
+
+.modal-body .current-price {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--primary-color);
+}
+
+.modal-body .old-price {
+  color: var(--text-muted);
+  text-decoration: line-through;
+  margin-left: 0.5rem;
+}
+
+.modal-body .product-description {
+  color: var(--text-secondary);
+  line-height: 1.6;
+  margin-bottom: 2rem;
+}
+
+.modal-body .product-actions {
+  display: flex;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.modal-body .product-actions button,
+.modal-body .product-actions a {
+  flex: 1;
+  min-width: 120px;
+  text-align: center;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+}
+
+@keyframes modalFadeIn {
+  from {
+    opacity: 0;
+    transform: scale(0.9);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@media (max-width: 768px) {
+  .modal-body {
+    flex-direction: column;
+    padding: 1rem;
+  }
+  
+  .modal-body .product-actions {
+    flex-direction: column;
+  }
+  
+  .modal-body .product-actions button,
+  .modal-body .product-actions a {
+    flex: none;
+  }
+}
+
+/* Payment Modal Styles */
+.payment-modal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.5);
+  display: none;
+  justify-content: center;
+  align-items: center;
+  z-index: 1301; /* Updated: Slightly higher than backdrop */
+}
+
+.payment-modal .modal-content {
+  max-width: 500px;
+  width: 90%;
+}
+
+.payment-modal .modal-header {
+  padding: 1.5rem 2rem 1rem;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.payment-modal .modal-header h3 {
+  margin: 0;
+  color: var(--text-primary);
+  font-size: 1.3rem;
+}
+
+.payment-modal .modal-footer {
+  padding: 1rem 2rem 1.5rem;
+  border-top: 1px solid var(--border-color);
+  display: flex;
+  gap: 1rem;
+  justify-content: flex-end;
+}
+
+.payment-modal .modal-footer button {
+  padding: 0.75rem 1.5rem;
+  border-radius: 6px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.payment-modal .btn-cancel {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  color: var(--text-secondary);
+}
+
+.payment-modal .btn-cancel:hover {
+  background: var(--hover-color);
+}
+
+.payment-modal .btn-confirm {
+  background: var(--primary-color);
+  border: 1px solid var(--primary-color);
+  color: var(--text-white);
+}
+
+.payment-modal .btn-confirm:hover {
+  background: var(--primary-hover);
+}
