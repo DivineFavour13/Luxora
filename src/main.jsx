@@ -17,6 +17,7 @@ import './styles/responsive.css';
 import './styles/wishlist.css';
 import './styles/account.css';
 import './styles/brand-store.css';
+import './styles/features.css';
 
 initializeStorage();
 

@@ -555,10 +555,10 @@ const products = [
     brand: "Fenty Beauty",
     rating: 4.7,
     reviews: 4521,
-    image: "/images/fenty-beauty-pro-filtr-foundation.jpg",
+    image: "/images/Fenty-Beauty-Pro-Filt'r-Foundation.jpg",
     images: [
-      "/images/fenty-beauty-pro-filtr-foundation2.jpg",
-      "/images/fenty-beauty-pro-filtr-foundation3.jpg"
+      "/images/Fenty-Beauty-Pro-Filt'r-Foundation2.jpg",
+      "/images/Fenty-Beauty-Pro-Filt'r-Foundation3.jpg"
     ],
     description: "Pro Filt'r Soft Matte Longwear Foundation. 50 shades for every skin tone. Buildable medium-to-full coverage that lasts up to 24 hours.",
     features: ["50 inclusive shades", "Buildable medium-to-full coverage", "Soft matte finish", "24-hour wear"],
@@ -595,10 +595,10 @@ const products = [
     brand: "The Ordinary",
     rating: 4.6,
     reviews: 8921,
-    image: "/images/niacinamide-zinc-serum.jpg",
+    image: "/images/Niacinamide-10%-+-Zinc-1%-Serum.jpg",
     images: [
-      "/images/niacinamide-zinc-serum2.jpg",
-      "/images/niacinamide-zinc-serum3.jpg"
+      "/images/Niacinamide-10%-+-Zinc-1%-Serum2.jpg",
+      "/images/Niacinamide-10%-+-Zinc-1%-Serum3.jpg"
     ],
     description: "High-strength vitamin and mineral blemish formula. Reduces the appearance of blemishes and congestion.",
     features: ["10% Niacinamide", "1% Zinc PCA", "Reduces blemishes", "Minimises pore appearance"],
@@ -666,17 +666,17 @@ const products = [
   // ─── LIFESTYLE — Fragrance ────────────────────────────────────────────
   {
     id: 31,
-    name: "Acqua di Gio Eau de Toilette",
+    name: "Acqua di Giò Eau de Toilette",
     price: 189999,
     originalPrice: 224999,
     category: "lifestyle",
     brand: "Giorgio Armani",
     rating: 4.9,
     reviews: 2341,
-    image: "/images/acqua-di-gio-eau-de-toilette.jpg",
+    image: "/images/Acqua-di-Giò-Eau-de-Toilette.jpg",
     images: [
-      "/images/acqua-di-gio-eau-de-toilette2.jpg",
-      "/images/acqua-di-gio-eau-de-toilette3.jpg"
+      "/images/Acqua-di-Giò-Eau-de-Toilette2.jpg",
+      "/images/Acqua-di-Giò-Eau-de-Toilette3.jpg"
     ],
     description: "An ode to the Mediterranean sea. Fresh citrus and marine notes blend with a warm base of cedarwood and patchouli.",
     features: ["Top: Bergamot, Neroli, Green Tangerine", "Heart: Marine notes, Rosemary", "Base: Cedar, Vetiver, Patchouli"],
@@ -1076,5 +1076,3 @@ const products = [
 ];
 
 export default products.map(normalizeProductAssets);
-
-

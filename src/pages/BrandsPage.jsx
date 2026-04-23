@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom';
+import { usePageMeta } from '../hooks/usePageMeta.js';
 import { useMemo } from 'react';
 import { getProducts } from '../utils/storage.js';
 import { getBrandMap, slugifyBrand } from '../utils/brands.js';
@@ -25,6 +26,8 @@ function getBrandColor(name) {
 }
 
 export default function BrandsPage() {
+
+  usePageMeta({ title: 'Brand Stores', description: 'Browse all brands on LUXORA — Nike, Zara, CeraVe, Coach, Levi\'s and more.' });
   const products = useMemo(() => getProducts() || [], []);
   const brands = useMemo(
     () => Array.from(getBrandMap(products).values()).sort((a, b) => a.localeCompare(b)),

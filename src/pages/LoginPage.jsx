@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { usePageMeta } from '../hooks/usePageMeta.js';
 import { useNavigate } from 'react-router-dom';
 import {
   authenticateUserByIdentifier,
@@ -21,6 +22,8 @@ function EyeIcon({ closed = false }) {
 }
 
 export default function LoginPage() {
+
+  usePageMeta({ title: 'Login / Register', description: 'Sign in or create a LUXORA account to shop, track orders, and manage your profile.' });
   const [isLogin, setIsLogin] = useState(true);
   const [rememberMe, setRememberMe] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);

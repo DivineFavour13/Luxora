@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { usePageMeta } from '../hooks/usePageMeta.js';
 import { Link } from 'react-router-dom';
 import products from '../data/products-data.js';
 import { addToCart, addToWishlist, removeFromWishlist, isInWishlist } from '../utils/storage.js';
@@ -6,6 +7,8 @@ import { formatCurrency } from '../utils/format.js';
 import { showNotification } from '../utils/notifications.js';
 
 export default function FlashSalesPage() {
+
+  usePageMeta({ title: 'Flash Sales', description: 'Limited-time offers on top products. Shop flash sales on LUXORA before they end!' });
   const [sortBy, setSortBy] = useState('discount');
   const [refresh, setRefresh] = useState(0);
 

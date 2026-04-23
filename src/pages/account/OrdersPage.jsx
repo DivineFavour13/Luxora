@@ -64,6 +64,31 @@ function OrderCard({ order, onStatusChange }) {
             ))}
           </div>
 
+
+          <div className="order-tracking-timeline">
+            <h4><i className="fas fa-map-marker-alt"></i> Order Progress</h4>
+            <div className="tracking-steps">
+              {['pending','processing','shipped','delivered'].map((step, i) => {
+                const steps = ['pending','processing','shipped','delivered'];
+                const currentIdx = steps.indexOf(status === 'cancelled' ? 'pending' : status);
+                const isDone = i <= currentIdx && status !== 'cancelled';
+                const isCurrent = i === currentIdx && status !== 'cancelled';
+                const labels = { pending: 'Order Placed', processing: 'Processing', shipped: 'Shipped', delivered: 'Delivered' };
+                const icons = { pending: 'fas fa-check', processing: 'fas fa-cog', shipped: 'fas fa-truck', delivered: 'fas fa-home' };
+                return (
+                  <div key={step} className={`tracking-step ${isDone ? 'done' : ''} ${isCurrent ? 'current' : ''}`}>
+                    <div className="tracking-dot"><i className={icons[step]}></i></div>
+                    <span>{labels[step]}</span>
+                    {i < 3 && <div className={`tracking-line ${i < currentIdx && status !== 'cancelled' ? 'done' : ''}`}></div>}
+                  </div>
+                );
+              })}
+            </div>
+            {status === 'cancelled' && (
+              <div className="tracking-cancelled"><i className="fas fa-times-circle"></i> This order was cancelled</div>
+            )}
+          </div>
+
           <div className="order-detail-footer">
             <div className="order-detail-meta">
               {order.shippingAddress && (

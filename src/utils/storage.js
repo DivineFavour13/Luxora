@@ -928,3 +928,74 @@ export {
   getUserPayments,
   saveUserPayments
 };
+
+// ==================== REVIEWS ====================
+const REVIEWS_KEY = 'luxora_reviews';
+
+function getReviews() {
+  try { return JSON.parse(localStorage.getItem(REVIEWS_KEY) || '{}'); } catch { return {}; }
+}
+
+function getProductReviews(productId) {
+  const all = getReviews();
+  return all[String(productId)] || [];
+}
+
+function addProductReview(productId, review) {
+  const all = getReviews();
+  const key = String(productId);
+  const existing = all[key] || [];
+  const newReview = { ...review, id: Date.now(), createdAt: new Date().toISOString() };
+  all[key] = [newReview, ...existing];
+  localStorage.setItem(REVIEWS_KEY, JSON.stringify(all));
+  window.dispatchEvent(new Event('reviewsUpdated'));
+  return newReview;
+}
+
+function hasUserReviewed(productId, userEmail) {
+  const reviews = getProductReviews(productId);
+  return reviews.some(r => r.userEmail === userEmail);
+}
+
+// ==================== PROMO CODES (admin-managed) ====================
+const PROMO_CODES_KEY = 'luxora_promo_codes';
+
+const DEFAULT_PROMOS = [
+  { code: 'WELCOME10', type: 'percentage', value: 10, description: '10% off your order', minOrderValue: 5000, maxDiscount: 10000, active: true },
+  { code: 'SAVE5000',  type: 'fixed',      value: 5000, description: '₦5,000 off your order', minOrderValue: 25000, active: true },
+  { code: 'FREESHIP',  type: 'shipping',   value: 0,    description: 'Free shipping',           minOrderValue: 0,     active: true },
+];
+
+function getPromoCodes() {
+  try {
+    const stored = localStorage.getItem(PROMO_CODES_KEY);
+    if (stored) return JSON.parse(stored);
+    localStorage.setItem(PROMO_CODES_KEY, JSON.stringify(DEFAULT_PROMOS));
+    return DEFAULT_PROMOS;
+  } catch { return DEFAULT_PROMOS; }
+}
+
+function savePromoCodes(codes) {
+  try { localStorage.setItem(PROMO_CODES_KEY, JSON.stringify(codes)); return true; } catch { return false; }
+}
+
+// ==================== NEWSLETTER ====================
+const NEWSLETTER_KEY = 'luxora_newsletter';
+
+function getNewsletterSubscribers() {
+  try { return JSON.parse(localStorage.getItem(NEWSLETTER_KEY) || '[]'); } catch { return []; }
+}
+
+function addNewsletterSubscriber(email) {
+  const list = getNewsletterSubscribers();
+  if (list.find(e => e.email === email)) return false;
+  list.push({ email, subscribedAt: new Date().toISOString() });
+  localStorage.setItem(NEWSLETTER_KEY, JSON.stringify(list));
+  return true;
+}
+
+export {
+  getReviews, getProductReviews, addProductReview, hasUserReviewed,
+  getPromoCodes, savePromoCodes,
+  getNewsletterSubscribers, addNewsletterSubscriber,
+};

@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { usePageMeta } from '../hooks/usePageMeta.js';
 import { Link } from 'react-router-dom';
 import products from '../data/products-data.js';
 import { addToCart, addToWishlist, removeFromWishlist, isInWishlist, getProducts } from '../utils/storage.js';
@@ -6,6 +7,8 @@ import { formatCurrency } from '../utils/format.js';
 import { showNotification } from '../utils/notifications.js';
 
 export default function NewArrivalsPage() {
+
+  usePageMeta({ title: 'New Arrivals', description: 'Freshly added products across fashion, beauty and lifestyle. Be the first to shop new arrivals on LUXORA.' });
   const [sortBy, setSortBy] = useState('newest');
   const [category, setCategory] = useState('all');
   const [refresh, setRefresh] = useState(0);

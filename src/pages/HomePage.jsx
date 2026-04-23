@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
+import { usePageMeta } from '../hooks/usePageMeta.js';
 import { Link, useNavigate } from 'react-router-dom';
 import products from '../data/products-data.js';
-import { addToCart, addToWishlist, getProducts, isInWishlist, removeFromWishlist } from '../utils/storage.js';
+import { addToCart, addToWishlist, getProducts, isInWishlist, removeFromWishlist, getRecentlyViewed, addNewsletterSubscriber } from '../utils/storage.js';
 import { showNotification } from '../utils/notifications.js';
 import { formatCurrency } from '../utils/format.js';
 import { slugifyBrand } from '../utils/brands.js';
@@ -313,9 +314,12 @@ function EditorialStrip({ title, route, products: stripProducts, onToggleWishlis
 }
 
 export default function HomePage() {
+
+  usePageMeta({ title: 'Fashion, Beauty & Lifestyle', description: 'Shop the latest fashion, beauty, and lifestyle products on LUXORA. Flash sales, top sellers, and new arrivals updated daily.' });
   const navigate = useNavigate();
   const [countdown, setCountdown] = useState('12h : 00m : 00s');
   const [, setWishlistVersion] = useState(0);
+  const [recentlyViewed, setRecentlyViewed] = useState(() => getRecentlyViewed().slice(0, 6));
   const [activeColor, setActiveColor] = useState('');
   const [catalogProducts, setCatalogProducts] = useState(() => {
     const stored = getProducts();
@@ -354,6 +358,12 @@ export default function HomePage() {
     () => selectShowcaseProducts(catalogProducts, (product) => product.isNewArrival, byNewest, 6),
     [catalogProducts]
   );
+
+  useEffect(() => {
+    const syncRecent = () => setRecentlyViewed(getRecentlyViewed().slice(0, 6));
+    window.addEventListener('focus', syncRecent);
+    return () => window.removeEventListener('focus', syncRecent);
+  }, []);
 
   useEffect(() => {
     const syncProducts = () => {
@@ -492,6 +502,40 @@ export default function HomePage() {
         />
       </div>
 
+      {recentlyViewed.length > 0 && (
+        <section className="home-recently-viewed">
+          <div className="container">
+            <div className="lookbook-strip-head">
+              <div>
+                <span className="lookbook-overline">Continue Browsing</span>
+                <h2>Recently Viewed</h2>
+              </div>
+            </div>
+            <div className="lookbook-strip-scroller">
+              {recentlyViewed.map(product => {
+                const inWishlist = isInWishlist(product.id);
+                return (
+                  <article className="lookbook-strip-item" key={product.id}>
+                    <button className={`lookbook-strip-wishlist ${inWishlist ? 'active' : ''}`} onClick={() => handleWishlist(product)}>
+                      <i className={inWishlist ? 'fas fa-heart' : 'far fa-heart'}></i>
+                    </button>
+                    <Link to={`/product?id=${product.id}`} className="lookbook-strip-image">
+                      <img src={product.image} alt={product.name} />
+                    </Link>
+                    <div className="lookbook-strip-copy">
+                      <span>{product.brand}</span>
+                      <h3><Link to={`/product?id=${product.id}`}>{product.name}</Link></h3>
+                      <strong>{formatCurrency(product.flashPrice || product.price)}</strong>
+                    </div>
+                    <button className="lookbook-strip-cta" onClick={() => handleAddToCart(product)}>Add to Cart</button>
+                  </article>
+                );
+              })}
+            </div>
+          </div>
+        </section>
+      )}
+
       <section className="newsletter-section">
         <div className="container">
           <div className="newsletter-content">
@@ -504,7 +548,8 @@ export default function HomePage() {
                 event.preventDefault();
                 const email = event.currentTarget.querySelector('#newsletter-email')?.value || '';
                 if (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-                  showNotification('Thank you for subscribing to our newsletter!', 'success');
+                  const added = addNewsletterSubscriber(email);
+                  showNotification(added ? 'Thank you for subscribing!' : 'You are already subscribed!', added ? 'success' : 'info');
                   event.currentTarget.reset();
                 } else {
                   showNotification('Please enter a valid email address', 'error');

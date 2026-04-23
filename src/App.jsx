@@ -17,6 +17,7 @@ import TopSellersPage from './pages/TopSellersPage.jsx';
 import NewArrivalsPage from './pages/NewArrivalsPage.jsx';
 import BrandStorePage from './pages/BrandStorePage.jsx';
 import BrandsPage from './pages/BrandsPage.jsx';
+import SearchPage from './pages/SearchPage.jsx';
 
 export default function App() {
   return (
@@ -39,6 +40,7 @@ export default function App() {
         <Route path="/new-arrivals" element={<NewArrivalsPage />} />
         <Route path="/brands" element={<BrandsPage />} />
         <Route path="/brand/:brandSlug" element={<BrandStorePage />} />
+        <Route path="/search" element={<SearchPage />} />
       </Route>
     </Routes>
   );

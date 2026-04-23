@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { usePageMeta } from '../hooks/usePageMeta.js';
 import { Link, useNavigate } from 'react-router-dom';
 import {
   getCart,
@@ -14,16 +15,11 @@ import {
   createOrder,
   saveProducts,
   getUserAddresses,
-  getUserPayments
+  getUserPayments,
+  getPromoCodes
 } from '../utils/storage.js';
 import { formatCurrency } from '../utils/format.js';
 import { showNotification } from '../utils/notifications.js';
-
-const PROMO_CODES = [
-  { code: 'WELCOME10', type: 'percentage', value: 10, description: '10% off your order', minOrderValue: 5000, maxDiscount: 10000, active: true },
-  { code: 'SAVE5000', type: 'fixed', value: 5000, description: '₦5,000 off your order', minOrderValue: 25000, active: true },
-  { code: 'FREESHIP', type: 'shipping', value: 0, description: 'Free shipping', minOrderValue: 0, active: true }
-];
 
 function CheckoutModal({ cart, subtotal, shipping, discount, total, onClose, onConfirm }) {
   const user = getCurrentUser();
@@ -335,6 +331,8 @@ function OrderSuccessModal({ order, onClose }) {
 }
 
 export default function CartPage() {
+
+  usePageMeta({ title: 'Shopping Cart', description: 'Review your cart and proceed to checkout on LUXORA.' });
   const [cart, setCart] = useState(() => (getCart() || []).filter((item) => typeof item.price === 'number' && !Number.isNaN(item.price)));
   const [promoInput, setPromoInput] = useState('');
   const [updatedItemId, setUpdatedItemId] = useState(null);
@@ -412,7 +410,7 @@ export default function CartPage() {
     e.preventDefault();
     const code = promoInput.trim().toUpperCase();
     if (!code) return;
-    const promo = PROMO_CODES.find((p) => p.code === code && p.active);
+    const promo = getPromoCodes().find((p) => p.code === code && p.active);
     if (!promo) { showNotification('Invalid promo code', 'error'); return; }
     if (promo.minOrderValue && subtotal < promo.minOrderValue) {
       showNotification(`Minimum order of ${formatCurrency(promo.minOrderValue)} required`, 'warning');

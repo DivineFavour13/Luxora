@@ -8,7 +8,10 @@ import {
   getOrders,
   updateOrderStatus,
   getSettings,
-  saveSettings
+  saveSettings,
+  getPromoCodes,
+  savePromoCodes,
+  getNewsletterSubscribers,
 } from '../utils/storage.js';
 import { formatCurrency } from '../utils/format.js';
 import { showNotification } from '../utils/notifications.js';
@@ -119,6 +122,10 @@ export default function AdminPage() {
   const [categoryFilter, setCategoryFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const [showProductForm, setShowProductForm] = useState(false);
+  const [promoCodes, setPromoCodes] = useState([]);
+  const [promoForm, setPromoForm] = useState({ code: '', type: 'percentage', value: '', description: '', minOrderValue: 0, active: true });
+  const [showPromoForm, setShowPromoForm] = useState(false);
+  const [newsletter, setNewsletter] = useState([]);
   const [orderSearch, setOrderSearch] = useState('');
   const [orderStatusFilter, setOrderStatusFilter] = useState('');
   const [productForm, setProductForm] = useState({
@@ -139,6 +146,8 @@ export default function AdminPage() {
     setUsers(getUsers());
     setOrders(getOrders());
     setSettings(getSettings());
+    setPromoCodes(getPromoCodes());
+    setNewsletter(getNewsletterSubscribers());
   }, [navigate]);
 
   const totalRevenue = useMemo(() => orders.reduce((s, o) => s + Number(o.total || 0), 0), [orders]);
@@ -243,6 +252,7 @@ export default function AdminPage() {
     { id: 'orders', icon: 'fas fa-receipt', label: 'Orders' },
     { id: 'users', icon: 'fas fa-users', label: 'Users' },
     { id: 'analytics', icon: 'fas fa-chart-bar', label: 'Analytics' },
+    { id: 'promos', icon: 'fas fa-tag', label: 'Promos' },
     { id: 'settings', icon: 'fas fa-sliders-h', label: 'Settings' },
   ];
 
@@ -742,6 +752,133 @@ export default function AdminPage() {
                       </div>
                     ))}
                   </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+
+          {/* ══ PROMOS ══ */}
+          {section === 'promos' && (
+            <div className="admin-page">
+              <div className="admin-page-header">
+                <div>
+                  <h1>Promo Codes</h1>
+                  <p className="admin-page-sub">{promoCodes.length} codes · {promoCodes.filter(p => p.active).length} active</p>
+                </div>
+                <button className="btn-primary" onClick={() => { setPromoForm({ code: '', type: 'percentage', value: '', description: '', minOrderValue: 0, active: true }); setShowPromoForm(true); }}>
+                  <i className="fas fa-plus"></i> New Code
+                </button>
+              </div>
+
+              {showPromoForm && (
+                <div className="admin-card admin-form-card">
+                  <div className="admin-card-header">
+                    <h3><i className="fas fa-tag"></i> Create Promo Code</h3>
+                    <button className="admin-close-btn" onClick={() => setShowPromoForm(false)}><i className="fas fa-times"></i></button>
+                  </div>
+                  <form className="admin-product-form" onSubmit={e => {
+                    e.preventDefault();
+                    if (!promoForm.code || !promoForm.value || !promoForm.description) { showNotification('Fill all fields', 'error'); return; }
+                    const existing = promoCodes.find(p => p.code === promoForm.code.toUpperCase().trim());
+                    if (existing) { showNotification('Code already exists', 'error'); return; }
+                    const next = [...promoCodes, { ...promoForm, code: promoForm.code.toUpperCase().trim(), value: Number(promoForm.value), minOrderValue: Number(promoForm.minOrderValue || 0) }];
+                    savePromoCodes(next);
+                    setPromoCodes(next);
+                    setShowPromoForm(false);
+                    showNotification('Promo code created', 'success');
+                  }}>
+                    <div className="apf-grid">
+                      <div className="form-group">
+                        <label>Code *</label>
+                        <input className="form-control" value={promoForm.code} onChange={e => setPromoForm(p => ({...p, code: e.target.value.toUpperCase()}))} placeholder="SAVE20" style={{fontFamily:'monospace',fontWeight:700}} />
+                      </div>
+                      <div className="form-group">
+                        <label>Type *</label>
+                        <select className="form-control admin-select" value={promoForm.type} onChange={e => setPromoForm(p => ({...p, type: e.target.value}))}>
+                          <option value="percentage">Percentage (%)</option>
+                          <option value="fixed">Fixed Amount (₦)</option>
+                          <option value="shipping">Free Shipping</option>
+                        </select>
+                      </div>
+                      <div className="form-group">
+                        <label>Value * {promoForm.type === 'percentage' ? '(%)' : promoForm.type === 'fixed' ? '(₦)' : '(leave 0)'}</label>
+                        <input className="form-control" type="number" min="0" value={promoForm.value} onChange={e => setPromoForm(p => ({...p, value: e.target.value}))} placeholder={promoForm.type === 'percentage' ? '10' : '5000'} />
+                      </div>
+                      <div className="form-group">
+                        <label>Min Order Value (₦)</label>
+                        <input className="form-control" type="number" min="0" value={promoForm.minOrderValue} onChange={e => setPromoForm(p => ({...p, minOrderValue: e.target.value}))} placeholder="0" />
+                      </div>
+                      <div className="form-group apf-full">
+                        <label>Description *</label>
+                        <input className="form-control" value={promoForm.description} onChange={e => setPromoForm(p => ({...p, description: e.target.value}))} placeholder="e.g. 10% off your order" />
+                      </div>
+                    </div>
+                    <div className="apf-actions">
+                      <button type="button" className="btn-secondary" onClick={() => setShowPromoForm(false)}>Cancel</button>
+                      <button type="submit" className="btn-primary"><i className="fas fa-save"></i> Create Code</button>
+                    </div>
+                  </form>
+                </div>
+              )}
+
+              <div className="admin-card admin-table-card">
+                <div className="admin-table-wrap">
+                  <table className="admin-table">
+                    <thead>
+                      <tr><th>Code</th><th>Type</th><th>Value</th><th>Min Order</th><th>Description</th><th>Status</th><th>Actions</th></tr>
+                    </thead>
+                    <tbody>
+                      {promoCodes.length === 0 && <tr><td colSpan="7" className="admin-table-empty">No promo codes yet</td></tr>}
+                      {promoCodes.map((p, i) => (
+                        <tr key={p.code}>
+                          <td><code style={{fontWeight:700,fontSize:'0.9rem'}}>{p.code}</code></td>
+                          <td><span className="admin-cat-pill">{p.type}</span></td>
+                          <td><strong>{p.type === 'percentage' ? p.value + '%' : p.type === 'fixed' ? formatCurrency(p.value) : 'Free'}</strong></td>
+                          <td>{p.minOrderValue > 0 ? formatCurrency(p.minOrderValue) : '—'}</td>
+                          <td style={{maxWidth:'200px',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{p.description}</td>
+                          <td>
+                            <span className={`admin-prod-status ${p.active ? 'active' : 'inactive'}`}>{p.active ? 'Active' : 'Inactive'}</span>
+                          </td>
+                          <td>
+                            <div className="admin-row-actions">
+                              <button className="admin-action-btn edit" title={p.active ? 'Deactivate' : 'Activate'} onClick={() => {
+                                const next = promoCodes.map((c,j) => j===i ? {...c, active: !c.active} : c);
+                                savePromoCodes(next); setPromoCodes(next);
+                              }}><i className={p.active ? 'fas fa-pause' : 'fas fa-play'}></i></button>
+                              <button className="admin-action-btn delete" title="Delete" onClick={() => {
+                                if (!confirm('Delete this promo code?')) return;
+                                const next = promoCodes.filter((_,j) => j!==i);
+                                savePromoCodes(next); setPromoCodes(next);
+                                showNotification('Promo code deleted', 'success');
+                              }}><i className="fas fa-trash"></i></button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              <div className="admin-card" style={{marginTop:'1rem'}}>
+                <div className="admin-card-header">
+                  <h3><i className="fas fa-envelope"></i> Newsletter Subscribers</h3>
+                  <span className="admin-card-hint">{newsletter.length} subscribers</span>
+                </div>
+                <div className="admin-table-wrap">
+                  <table className="admin-table">
+                    <thead><tr><th>Email</th><th>Subscribed</th></tr></thead>
+                    <tbody>
+                      {newsletter.length === 0 && <tr><td colSpan="2" className="admin-table-empty"><i className="fas fa-envelope"></i> No subscribers yet</td></tr>}
+                      {newsletter.map(s => (
+                        <tr key={s.email}>
+                          <td>{s.email}</td>
+                          <td>{new Date(s.subscribedAt).toLocaleDateString('en-GB', {day:'numeric',month:'short',year:'numeric'})}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
                 </div>
               </div>
             </div>

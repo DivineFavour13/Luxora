@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { usePageMeta } from '../hooks/usePageMeta.js';
 import { Link } from 'react-router-dom';
 import {
   getWishlist,
@@ -12,6 +13,8 @@ import { formatCurrency } from '../utils/format.js';
 import { showNotification } from '../utils/notifications.js';
 
 export default function WishlistPage() {
+
+  usePageMeta({ title: 'My Wishlist', description: 'Your saved products on LUXORA.' });
   const [wishlist, setWishlist] = useState(() => getWishlist());
 
   useEffect(() => {

@@ -61,8 +61,7 @@ export default function Header() {
     if (matched.length === 1) {
       navigate(`/product?id=${matched[0].id}`);
     } else {
-      navigate(`/?q=${encodeURIComponent(query)}`);
-      showNotification(`Showing results for "${query}"`, 'info');
+      navigate(`/search?q=${encodeURIComponent(query)}`);
     }
     setSearchValue('');
   };
