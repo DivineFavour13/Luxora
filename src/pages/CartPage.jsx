@@ -20,6 +20,7 @@ import {
 } from '../utils/storage.js';
 import { formatCurrency } from '../utils/format.js';
 import { showNotification } from '../utils/notifications.js';
+import { apiCreateOrder, getToken } from '../utils/api.js';
 
 function CheckoutModal({ cart, subtotal, shipping, discount, total, onClose, onConfirm }) {
   const user = getCurrentUser();
@@ -343,7 +344,9 @@ export default function CartPage() {
   const [completedOrder, setCompletedOrder] = useState(null);
   const navigate = useNavigate();
 
-  useEffect(() => { saveCart(cart); }, [cart]);
+  useEffect(() => {
+    if (cart.length >= 0) saveCart(cart);
+  }, [JSON.stringify(cart)]);
 
   useEffect(() => {
     const onCart = () => setCart((getCart() || []).filter((item) => typeof item.price === 'number' && !Number.isNaN(item.price)));
@@ -446,9 +449,26 @@ export default function CartPage() {
     setShowCheckout(true);
   };
 
-  const handleConfirmOrder = ({ shippingAddress, paymentMethod }) => {
+  const handleConfirmOrder = async ({ shippingAddress, paymentMethod }) => {
     const user = getCurrentUser();
     if (!user) return;
+
+    // Send order to backend if user has a token
+    if (getToken()) {
+      try {
+        const items = cart.map((item) => ({
+          productId: item.id,
+          name: item.name,
+          price: item.price,
+          quantity: item.quantity,
+        }));
+        await apiCreateOrder(items);
+      } catch (_) {
+        // Backend unavailable — continue with localStorage only
+      }
+    }
+
+    // Always save to localStorage (keeps existing order history working)
     const order = createOrder({
       userId: user.id,
       userEmail: user.email,
@@ -460,6 +480,7 @@ export default function CartPage() {
       orderDate: new Date().toISOString()
     });
     if (!order) { showNotification('Failed to place order. Please try again.', 'error'); return; }
+
     const reducedStockProducts = getProducts().map((product) => {
       const cartItem = cart.find((item) => item.id === product.id);
       if (!cartItem) return product;

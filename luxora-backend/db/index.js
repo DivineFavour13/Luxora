@@ -1,0 +1,37 @@
+const low = require("lowdb");
+const FileSync = require("lowdb/adapters/FileSync");
+const path = require("path");
+
+const adapter = new FileSync(path.join(__dirname, "../luxora-data.json"));
+const db = low(adapter);
+
+// Set default structure + seed products if empty
+db.defaults({
+  users: [],
+  orders: [],
+  orderItems: [],
+  _nextId: { users: 1, orders: 1, orderItems: 1 },
+  products: [
+    { id: 1, name: "Velvet Noir Handbag", brand: "Maison Elara", category: "bags", price: 285000, description: "Structured velvet handbag with gold-tone hardware.", image: "https://images.unsplash.com/photo-1548036328-c9fa89d128fa?w=600", stock: 8 },
+    { id: 2, name: "Silk Wrap Midi Dress", brand: "House of Adire", category: "clothing", price: 195000, description: "Flowing silk wrap dress in champagne ivory.", image: "https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?w=600", stock: 12 },
+    { id: 3, name: "Oud & Amber Perfume", brand: "Scentara Lagos", category: "beauty", price: 75000, description: "Rich oud with warm amber base notes. 100ml EDP.", image: "https://images.unsplash.com/photo-1541643600914-78b084683702?w=600", stock: 20 },
+    { id: 4, name: "Gold Cuff Bracelet", brand: "Ore Fine Jewels", category: "jewelry", price: 120000, description: "18k gold-plated wide cuff with engraved detail.", image: "https://images.unsplash.com/photo-1611591437281-460bfbe1220a?w=600", stock: 15 },
+    { id: 5, name: "Leather Chelsea Boots", brand: "Vogue Sole", category: "shoes", price: 165000, description: "Genuine leather Chelsea boots with elastic side panel.", image: "https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=600", stock: 10 },
+    { id: 6, name: "Crystal Drop Earrings", brand: "Ore Fine Jewels", category: "jewelry", price: 58000, description: "Swarovski crystal drop earrings, sterling silver post.", image: "https://images.unsplash.com/photo-1535632066927-ab7c9ab60908?w=600", stock: 25 },
+    { id: 7, name: "Tailored Blazer", brand: "House of Adire", category: "clothing", price: 220000, description: "Double-breasted blazer in crepe fabric. Navy & gold buttons.", image: "https://images.unsplash.com/photo-1591047139829-d91aecb6caea?w=600", stock: 7 },
+    { id: 8, name: "Rose Gold Timepiece", brand: "Tempora Watch Co.", category: "accessories", price: 450000, description: "Swiss quartz movement, sapphire glass, rose gold case.", image: "https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=600", stock: 5 },
+    { id: 9, name: "Caviar Moisturiser", brand: "Lumière Skin", category: "beauty", price: 48000, description: "Hydrating caviar extract day cream, 50ml.", image: "https://images.unsplash.com/photo-1556228578-0d85b1a4d571?w=600", stock: 30 },
+    { id: 10, name: "Crocodile-Embossed Wallet", brand: "Maison Elara", category: "accessories", price: 95000, description: "Slim bifold wallet in crocodile-embossed leather.", image: "https://images.unsplash.com/photo-1627123424574-724758594e93?w=600", stock: 18 },
+    { id: 11, name: "Strappy Heel Sandal", brand: "Vogue Sole", category: "shoes", price: 132000, description: "Open-toe strappy sandal, 8cm block heel, nude leather.", image: "https://images.unsplash.com/photo-1543163521-1bf539c55dd2?w=600", stock: 14 },
+    { id: 12, name: "Pearl Choker Necklace", brand: "Ore Fine Jewels", category: "jewelry", price: 88000, description: "Freshwater pearl choker on 14k gold-filled chain.", image: "https://images.unsplash.com/photo-1599643478518-a784e5dc4c8f?w=600", stock: 10 },
+  ],
+}).write();
+
+// Helper: auto-increment ID
+function nextId(collection) {
+  const id = db.get(`_nextId.${collection}`).value();
+  db.set(`_nextId.${collection}`, id + 1).write();
+  return id;
+}
+
+module.exports = { db, nextId };
