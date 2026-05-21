@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import AccountNav from '../components/AccountNav.jsx';
 import { getCurrentUser, getUserPreferences, saveUserPreferences } from '../utils/storage.js';
 import { showNotification } from '../utils/notifications.js';
+import { setActiveCurrency, fetchRates, getActiveCurrency } from '../utils/currency.js';
 
 export default function AccountPreferencesPage() {
   const navigate = useNavigate();
@@ -10,25 +11,47 @@ export default function AccountPreferencesPage() {
     currency: 'NGN',
     emailNotifications: true,
     smsUpdates: false,
-    newsletter: false
+    newsletter: false,
   });
+  const [loadingRates, setLoadingRates] = useState(false);
 
   useEffect(() => {
     const user = getCurrentUser();
-    if (!user) {
-      navigate('/login');
-      return;
-    }
-    setPrefs(getUserPreferences(user));
+    if (!user) { navigate('/login'); return; }
+    const saved = getUserPreferences(user);
+    // Sync currency selector with what's actually active
+    setPrefs({ ...saved, currency: getActiveCurrency() });
   }, [navigate]);
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     const user = getCurrentUser();
     if (!user) return;
+
     const ok = saveUserPreferences(user, prefs);
-    if (ok) showNotification('Preferences saved', 'success');
-    else showNotification('Failed to save preferences', 'error');
+    if (!ok) { showNotification('Failed to save preferences', 'error'); return; }
+
+    // Apply the new currency
+    setActiveCurrency(prefs.currency);
+
+    // Fetch fresh rates if currency changed away from NGN
+    if (prefs.currency !== 'NGN') {
+      setLoadingRates(true);
+      showNotification('Fetching latest exchange rates...', 'info');
+      const rates = await fetchRates();
+      setLoadingRates(false);
+
+      if (!rates) {
+        showNotification('Could not fetch exchange rates. Prices may not convert correctly.', 'warning');
+      } else {
+        showNotification(`Preferences saved! Currency set to ${prefs.currency} ✓`, 'success');
+      }
+    } else {
+      showNotification('Preferences saved!', 'success');
+    }
+
+    // Reload so all formatCurrency calls across the site reflect the new currency
+    setTimeout(() => window.location.reload(), 800);
   };
 
   return (
@@ -120,8 +143,11 @@ export default function AccountPreferencesPage() {
                 </div>
 
                 <div className="form-actions">
-                  <button type="submit" className="btn-primary">
-                    <i className="fas fa-save"></i> Save Preferences
+                  <button type="submit" className="btn-primary" disabled={loadingRates}>
+                    {loadingRates
+                      ? <><i className="fas fa-spinner fa-spin"></i> Fetching rates...</>
+                      : <><i className="fas fa-save"></i> Save Preferences</>
+                    }
                   </button>
                 </div>
               </form>

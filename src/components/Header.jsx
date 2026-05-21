@@ -1,6 +1,6 @@
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useEffect, useState } from 'react';
-import { getCartItemCount, getCurrentUser, getProducts, logout } from '../utils/storage.js';
+import { getCartItemCount, getCurrentUser, getProducts, logout, getUserProfile } from '../utils/storage.js';
 import { showNotification } from '../utils/notifications.js';
 import { findBrandByQuery, slugifyBrand } from '../utils/brands.js';
 
@@ -10,17 +10,32 @@ export default function Header() {
   const [searchValue, setSearchValue] = useState('');
   const [user, setUser] = useState(() => getCurrentUser());
   const [cartCount, setCartCount] = useState(() => getCartItemCount());
+  const [photo, setPhoto] = useState(() => {
+    const u = getCurrentUser();
+    return u ? getUserProfile(u)?.photo || '' : '';
+  });
   const navigate = useNavigate();
   const location = useLocation();
 
   useEffect(() => {
-    const onUser = () => setUser(getCurrentUser());
+    const onUser = () => {
+      const u = getCurrentUser();
+      setUser(u);
+      setPhoto(u ? getUserProfile(u)?.photo || '' : '');
+    };
     const onCart = () => setCartCount(getCartItemCount());
+    const onProfile = () => {
+      const u = getCurrentUser();
+      setPhoto(u ? getUserProfile(u)?.photo || '' : '');
+    };
+
     window.addEventListener('userUpdated', onUser);
     window.addEventListener('cartUpdated', onCart);
+    window.addEventListener('profileUpdated', onProfile);
     return () => {
       window.removeEventListener('userUpdated', onUser);
       window.removeEventListener('cartUpdated', onCart);
+      window.removeEventListener('profileUpdated', onProfile);
     };
   }, []);
 
@@ -112,7 +127,15 @@ export default function Header() {
           <div className={`user-dropdown ${open ? 'active' : ''}`} id="user-dropdown">
             <button className="user-dropdown-btn" id="user-dropdown-btn"
               onClick={(e) => { e.preventDefault(); e.stopPropagation(); setOpen(!open); }}>
-              <i className="fas fa-user-circle"></i>
+              {photo ? (
+                <img
+                  src={photo}
+                  alt="Profile"
+                  style={{ width: 28, height: 28, borderRadius: '50%', objectFit: 'cover', marginRight: 4 }}
+                />
+              ) : (
+                <i className="fas fa-user-circle"></i>
+              )}
               <span id="user-name">{user ? (user.name?.split(' ')[0] || 'Account') : 'Account'}</span>
               {user?.role === 'admin' && <span className="admin-badge" id="admin-badge">Admin</span>}
               <i className="fas fa-chevron-down dropdown-arrow"></i>

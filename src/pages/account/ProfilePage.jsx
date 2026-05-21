@@ -40,8 +40,12 @@ export default function ProfilePage() {
     const user = getCurrentUser();
     if (!user) return;
     const ok = saveUserProfile(user, profile);
-    if (ok) showNotification('Profile updated', 'success');
-    else showNotification('Failed to save profile', 'error');
+    if (ok) {
+      showNotification('Profile updated', 'success');
+      window.dispatchEvent(new Event('profileUpdated'));
+    } else {
+      showNotification('Failed to save profile', 'error');
+    }
   };
 
   return (

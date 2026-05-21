@@ -20,6 +20,7 @@ import './styles/brand-store.css';
 import './styles/features.css';
 
 initializeStorage();
+import('./utils/currency.js').then(({ ensureRates }) => ensureRates());
 
 createRoot(document.getElementById('root')).render(
   <React.StrictMode>
