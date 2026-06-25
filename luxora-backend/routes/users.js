@@ -1,15 +1,19 @@
-const express = require("express");
-const { db } = require("../db");
-const authMiddleware = require("../middleware/auth");
+const express = require('express');
+const User = require('../models/User');
+const authMiddleware = require('../middleware/auth');
 
 const router = express.Router();
 router.use(authMiddleware);
 
 // GET /api/users/me
-router.get("/me", (req, res) => {
-  const user = db.get("users").find({ id: req.user.id }).value();
-  if (!user) return res.status(404).json({ error: "User not found" });
-  res.json({ id: user.id, name: user.name, email: user.email, created_at: user.created_at });
+router.get('/me', async (req, res) => {
+  try {
+    const user = await User.findById(req.user.id).select('-password');
+    if (!user) return res.status(404).json({ error: 'User not found' });
+    res.json(user);
+  } catch (err) {
+    res.status(500).json({ error: 'Server error' });
+  }
 });
 
 module.exports = router;

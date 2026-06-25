@@ -1,98 +1,78 @@
-const express = require("express");
-const { db, nextId } = require("../db");
-const authMiddleware = require("../middleware/auth");
+const express = require('express');
+const Order = require('../models/Order');
+const authMiddleware = require('../middleware/auth');
+const adminMiddleware = require('../middleware/admin');
 
 const router = express.Router();
 router.use(authMiddleware);
 
-// POST /api/orders
-router.post("/", (req, res) => {
-  const { items } = req.body;
-  const userId = req.user.id;
+// POST /api/orders — place an order
+router.post('/', async (req, res) => {
+  try {
+    const { items, subtotal, shipping, discount, total, shippingAddress, paymentMethod } = req.body;
 
-  if (!items || !Array.isArray(items) || items.length === 0)
-    return res.status(400).json({ error: "Order must contain at least one item" });
+    if (!items || !Array.isArray(items) || items.length === 0)
+      return res.status(400).json({ error: 'Order must contain at least one item' });
 
-  // Calculate total from item details sent by the frontend
-  let total = 0;
-  const resolvedItems = items.map((item) => {
-    const quantity = item.quantity || 1;
-    const price = item.price || 0;
-    total += price * quantity;
-    return {
-      productId: item.productId,
-      name: item.name || `Product ${item.productId}`,
-      quantity,
-      price,
-    };
-  });
+    const order = await Order.create({
+      user: req.user.id,
+      items,
+      subtotal: subtotal || 0,
+      shipping: shipping || 0,
+      discount: discount || 0,
+      total,
+      shippingAddress,
+      paymentMethod,
+    });
 
-  const orderId = nextId("orders");
-  const order = {
-    id: orderId,
-    user_id: userId,
-    total,
-    status: "pending",
-    created_at: new Date().toISOString(),
-  };
-
-  db.get("orders").push(order).write();
-
-  for (const item of resolvedItems) {
-    const itemId = nextId("orderItems");
-    db.get("orderItems")
-      .push({
-        id: itemId,
-        order_id: orderId,
-        product_id: item.productId,
-        name: item.name,
-        quantity: item.quantity,
-        price: item.price,
-      })
-      .write();
+    res.status(201).json({ message: 'Order placed successfully', orderId: order._id, total: order.total });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Server error' });
   }
-
-  res.status(201).json({ message: "Order placed successfully", orderId, total });
 });
 
-// GET /api/orders
-router.get("/", (req, res) => {
-  const orders = db.get("orders").filter({ user_id: req.user.id }).value();
+// GET /api/orders — current user's orders
+router.get('/', async (req, res) => {
+  try {
+    const orders = await Order.find({ user: req.user.id }).sort({ createdAt: -1 });
+    res.json(orders);
+  } catch (err) {
+    res.status(500).json({ error: 'Server error' });
+  }
+});
 
-  const result = orders.map((order) => {
-    const items = db
-      .get("orderItems")
-      .filter({ order_id: order.id })
-      .value()
-      .map((item) => ({
-        ...item,
-        name: item.name || `Product ${item.product_id}`,
-      }));
-    return { ...order, items };
-  });
-
-  res.json(result);
+// GET /api/orders/all — admin: all orders
+router.get('/all', adminMiddleware, async (req, res) => {
+  try {
+    const orders = await Order.find().populate('user', 'name email').sort({ createdAt: -1 });
+    res.json(orders);
+  } catch (err) {
+    res.status(500).json({ error: 'Server error' });
+  }
 });
 
 // GET /api/orders/:id
-router.get("/:id", (req, res) => {
-  const order = db
-    .get("orders")
-    .find({ id: parseInt(req.params.id), user_id: req.user.id })
-    .value();
+router.get('/:id', async (req, res) => {
+  try {
+    const order = await Order.findOne({ _id: req.params.id, user: req.user.id });
+    if (!order) return res.status(404).json({ error: 'Order not found' });
+    res.json(order);
+  } catch (err) {
+    res.status(500).json({ error: 'Server error' });
+  }
+});
 
-  if (!order) return res.status(404).json({ error: "Order not found" });
-
-  const items = db
-    .get("orderItems")
-    .filter({ order_id: order.id })
-    .value()
-    .map((item) => ({
-      ...item,
-      name: item.name || `Product ${item.product_id}`,
-    }));
-
-  res.json({ ...order, items });
+// PUT /api/orders/:id/status — admin: update order status
+router.put('/:id/status', adminMiddleware, async (req, res) => {
+  try {
+    const { status } = req.body;
+    const order = await Order.findByIdAndUpdate(req.params.id, { status }, { new: true });
+    if (!order) return res.status(404).json({ error: 'Order not found' });
+    res.json(order);
+  } catch (err) {
+    res.status(500).json({ error: 'Server error' });
+  }
 });
 
 module.exports = router;
