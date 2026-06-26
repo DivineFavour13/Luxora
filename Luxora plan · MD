@@ -1,0 +1,78 @@
+# LUXORA — Full-Stack Development Plan
+
+## Current Stack
+- Frontend: React + Vite (deployed on Vercel)
+- Backend: Node.js + Express
+- Database: lowdb (JSON file)
+- Auth: JWT
+- Currency: Live exchange rates
+
+---
+
+## Phase 1 — Real Database (MongoDB + Mongoose)
+**Goal:** Replace lowdb with MongoDB Atlas
+
+- [ ] Set up MongoDB Atlas free cluster
+- [ ] Install mongoose in backend
+- [ ] Create models: User, Product, Order, OrderItem
+- [ ] Migrate all routes to use Mongoose
+- [ ] Update .env with MONGODB_URI
+- [ ] Seed products into MongoDB
+
+---
+
+## Phase 2 — Products on the Backend
+**Goal:** Move products from frontend JS file to MongoDB
+
+- [ ] Seed all 50 frontend products into MongoDB
+- [ ] Create full products API (CRUD)
+- [ ] Update frontend to fetch products from API
+- [ ] Remove hardcoded products.js dependency
+- [ ] Add search and filter on the backend
+
+---
+
+## Phase 3 — Admin Dashboard Backend
+**Goal:** Wire existing admin UI to the backend
+
+- [ ] Admin: add/edit/delete products (persisted in MongoDB)
+- [ ] Admin: view all orders
+- [ ] Admin: update order status (pending → processing → shipped → delivered)
+- [ ] Protect admin routes with role-based middleware
+- [ ] Frontend admin panel reads/writes from API
+
+---
+
+## Phase 4 — Stripe Payment Integration
+**Goal:** Replace mock payment with real Stripe checkout
+
+- [ ] Set up Stripe account + API keys
+- [ ] Install stripe package in backend
+- [ ] Create payment intent endpoint
+- [ ] Add Stripe card element to checkout modal
+- [ ] Confirm payment before saving order
+- [ ] Handle webhooks for payment confirmation
+
+---
+
+## Phase 5 — Deploy Everything
+**Goal:** Live URL for submission
+
+- [ ] Deploy backend to Railway or Render
+- [ ] Set environment variables on hosting platform
+- [ ] Connect frontend to deployed backend URL
+- [ ] Deploy frontend to Vercel
+- [ ] Test full flow on live URL
+- [ ] Update README with live links
+
+---
+
+## Progress Tracker
+
+| Phase | Status |
+|-------|--------|
+| Phase 1 - MongoDB | 🔄 In Progress |
+| Phase 2 - Products on Backend | ⏳ Pending |
+| Phase 3 - Admin Backend | ⏳ Pending |
+| Phase 4 - Stripe Payments | ⏳ Pending |
+| Phase 5 - Deployment | ⏳ Pending |

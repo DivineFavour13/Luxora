@@ -8,6 +8,7 @@ import {
   addLoginActivity
 } from '../utils/storage.js';
 import { showNotification } from '../utils/notifications.js';
+import { apiLogin, apiRegister, saveToken } from '../utils/api.js';
 
 function EyeIcon({ closed = false }) {
   return closed ? (
@@ -70,7 +71,7 @@ export default function LoginPage() {
     return next;
   });
 
-  const handleLogin = (e) => {
+  const handleLogin = async (e) => {
     e.preventDefault();
     let valid = true;
     if (!identifier.trim()) {
@@ -100,6 +101,37 @@ export default function LoginPage() {
     }
 
     setIsSubmitting(true);
+
+    // Try backend API first (email logins only)
+    if (identifier.includes('@')) {
+      try {
+        const data = await apiLogin(identifier.trim(), password);
+        if (data.token) {
+          saveToken(data.token);
+          setCurrentUser(data.user);
+          if (rememberMe) {
+            localStorage.setItem('rememberMe', 'true');
+            localStorage.setItem('savedEmail', identifier.trim());
+          } else {
+            localStorage.removeItem('rememberMe');
+            localStorage.removeItem('savedEmail');
+          }
+          showNotification('Login successful! Redirecting...', 'success');
+          setTimeout(() => { setIsSubmitting(false); navigate('/'); }, 1000);
+          return;
+        }
+        if (data.error) {
+          showNotification(data.error, 'error');
+          setIsSubmitting(false);
+          return;
+        }
+      } catch (err) {
+        console.error('API login error:', err);
+        // Backend unavailable — fall through to localStorage
+      }
+    }
+
+    // Fallback: localStorage
     const user = authenticateUserByIdentifier(identifier.trim(), password);
     if (!user) {
       showNotification('Invalid email/phone or password', 'error');
@@ -108,7 +140,6 @@ export default function LoginPage() {
     }
     setCurrentUser(user);
     addLoginActivity?.(user, { at: new Date().toISOString(), device: navigator.userAgent || 'Unknown device' });
-
     if (rememberMe) {
       localStorage.setItem('rememberMe', 'true');
       localStorage.setItem('savedEmail', identifier.trim());
@@ -116,15 +147,11 @@ export default function LoginPage() {
       localStorage.removeItem('rememberMe');
       localStorage.removeItem('savedEmail');
     }
-
     showNotification('Login successful! Redirecting...', 'success');
-    setTimeout(() => {
-      setIsSubmitting(false);
-      navigate('/');
-    }, 1000);
+    setTimeout(() => { setIsSubmitting(false); navigate('/'); }, 1000);
   };
 
-  const handleRegister = (e) => {
+  const handleRegister = async (e) => {
     e.preventDefault();
     let valid = true;
 
@@ -155,6 +182,32 @@ export default function LoginPage() {
     }
 
     setIsSubmitting(true);
+
+    // Try backend API first
+    try {
+      const data = await apiRegister(
+        reg.name.trim(),
+        reg.email.toLowerCase().trim(),
+        reg.password
+      );
+      if (data.token) {
+        saveToken(data.token);
+        setCurrentUser(data.user);
+        showNotification('Account created! Welcome to LUXORA 🎉', 'success');
+        setTimeout(() => { setIsSubmitting(false); navigate('/'); }, 1000);
+        return;
+      }
+      if (data.error) {
+        showNotification(data.error, 'error');
+        setIsSubmitting(false);
+        return;
+      }
+    } catch (err) {
+      console.error('API register error:', err);
+      // Backend unavailable — fall through to localStorage
+    }
+
+    // Fallback: localStorage
     const added = addUser({
       name: reg.name.trim(),
       email: reg.email.toLowerCase().trim(),
@@ -167,7 +220,6 @@ export default function LoginPage() {
       setIsSubmitting(false);
       return;
     }
-
     const user = {
       name: reg.name.trim(),
       email: reg.email.toLowerCase().trim(),
@@ -178,10 +230,7 @@ export default function LoginPage() {
     setCurrentUser(user);
     addLoginActivity?.(user, { at: new Date().toISOString(), device: navigator.userAgent || 'Unknown device' });
     showNotification('Account created successfully! Redirecting...', 'success');
-    setTimeout(() => {
-      setIsSubmitting(false);
-      navigate('/');
-    }, 1000);
+    setTimeout(() => { setIsSubmitting(false); navigate('/'); }, 1000);
   };
 
   const fillDemo = () => {

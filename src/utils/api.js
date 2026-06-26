@@ -1,7 +1,5 @@
 // LUXORA API Client
-// Place this file at: src/utils/api.js
-
-const BASE_URL = 'http://localhost:3001/api';
+const BASE_URL = 'http://localhost:5000/api';
 
 // --- Token helpers ---
 export function getToken() {
@@ -32,6 +30,13 @@ export async function apiLogin(email, password) {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ email, password }),
   });
+  return res.json();
+}
+
+// --- Products ---
+export async function apiGetProducts(params = {}) {
+  const query = new URLSearchParams(params).toString();
+  const res = await fetch(`${BASE_URL}/products${query ? '?' + query : ''}`);
   return res.json();
 }
 
