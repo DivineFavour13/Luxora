@@ -1,7 +1,6 @@
 // LUXORA API Client
-// src/utils/api.js
 
-const BASE_URL = 'http://localhost:3001/api';
+const BASE_URL = 'https://luxora-7uwx.onrender.com/api';
 
 // --- Token helpers ---
 export function getToken() {
