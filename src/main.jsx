@@ -29,10 +29,11 @@ fetch('http://localhost:3001/api/products')
   .then(r => r.json())
   .then(apiProducts => {
     if (Array.isArray(apiProducts) && apiProducts.length > 0) {
-      // Normalize: add numeric id for frontend compatibility
+      // Normalize: add numeric id and preserve _mongoId for admin CRUD
       const normalized = apiProducts.map((p, index) => ({
         ...p,
         id: index + 1,
+        _mongoId: p._id?.toString(),
       }));
       saveProducts(normalized);
       console.log(`✅ Synced ${normalized.length} products from backend`);

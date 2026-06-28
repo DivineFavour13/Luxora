@@ -15,10 +15,14 @@ app.use('/api/auth',     require('./routes/auth'));
 app.use('/api/products', require('./routes/products'));
 app.use('/api/orders',   require('./routes/orders'));
 app.use('/api/users',    require('./routes/users'));
+app.use('/api/payments', require('./routes/payments'));
 
 // --- Health check ---
 app.get('/', (req, res) => {
-  res.json({ message: 'LUXORA API is running ✨', db: mongoose.connection.readyState === 1 ? 'connected' : 'disconnected' });
+  res.json({
+    message: 'LUXORA API is running ✨',
+    db: mongoose.connection.readyState === 1 ? 'connected' : 'disconnected'
+  });
 });
 
 // --- 404 ---

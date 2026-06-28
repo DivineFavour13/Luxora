@@ -15,6 +15,15 @@ import {
 } from '../utils/storage.js';
 import { formatCurrency } from '../utils/format.js';
 import { showNotification } from '../utils/notifications.js';
+import {
+  getToken,
+  apiAdminAddProduct,
+  apiAdminUpdateProduct,
+  apiAdminDeleteProduct,
+  apiAdminGetAllOrders,
+  apiAdminUpdateOrderStatus,
+  apiAdminGetAllUsers,
+} from '../utils/api.js';
 
 const STATUS_META = {
   pending:    { label: 'Pending',    color: '#f59e0b', bg: 'rgba(245,158,11,0.1)',  icon: 'fas fa-clock' },
@@ -93,10 +102,10 @@ function MiniOrderList({ orders }) {
       {orders.map(o => {
         const m = STATUS_META[o.status || 'pending'] || STATUS_META.pending;
         return (
-          <div key={o.id} className="admin-mini-order">
+          <div key={o._id || o.id} className="admin-mini-order">
             <div className="admin-mini-order-info">
-              <strong>#{o.id}</strong>
-              <span>{o.userName || o.userEmail || 'Guest'}</span>
+              <strong>#{o._id || o.id}</strong>
+              <span>{o.userName || o.userEmail || (o.user?.name) || 'Guest'}</span>
             </div>
             <div className="admin-mini-order-right">
               <span className="admin-status-badge" style={{ color: m.color, background: m.bg, fontSize: '0.75rem' }}>
@@ -142,12 +151,40 @@ export default function AdminPage() {
       navigate('/');
       return;
     }
+
+    // Load from localStorage first (instant)
     setProducts(getProducts());
-    setUsers(getUsers());
-    setOrders(getOrders());
     setSettings(getSettings());
     setPromoCodes(getPromoCodes());
     setNewsletter(getNewsletterSubscribers());
+
+    // Load from backend if token available
+    if (getToken()) {
+      // Fetch all orders from backend
+      apiAdminGetAllOrders()
+        .then(data => {
+          if (Array.isArray(data)) {
+            setOrders(data);
+          } else {
+            setOrders(getOrders());
+          }
+        })
+        .catch(() => setOrders(getOrders()));
+
+      // Fetch all users from backend
+      apiAdminGetAllUsers()
+        .then(data => {
+          if (Array.isArray(data)) {
+            setUsers(data);
+          } else {
+            setUsers(getUsers());
+          }
+        })
+        .catch(() => setUsers(getUsers()));
+    } else {
+      setOrders(getOrders());
+      setUsers(getUsers());
+    }
   }, [navigate]);
 
   const totalRevenue = useMemo(() => orders.reduce((s, o) => s + Number(o.total || 0), 0), [orders]);
@@ -167,10 +204,13 @@ export default function AdminPage() {
   const filteredOrders = useMemo(() => {
     const sorted = [...orders].sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
     return sorted.filter(o => {
+      const orderId = String(o._id || o.id || '');
+      const customerName = String(o.user?.name || o.userName || '').toLowerCase();
+      const customerEmail = String(o.user?.email || o.userEmail || '').toLowerCase();
       const bySearch = !orderSearch.trim() ||
-        String(o.id).includes(orderSearch) ||
-        String(o.userName || '').toLowerCase().includes(orderSearch.toLowerCase()) ||
-        String(o.userEmail || '').toLowerCase().includes(orderSearch.toLowerCase());
+        orderId.includes(orderSearch) ||
+        customerName.includes(orderSearch.toLowerCase()) ||
+        customerEmail.includes(orderSearch.toLowerCase());
       const bySt = !orderStatusFilter || (o.status || 'pending') === orderStatusFilter;
       return bySearch && bySt;
     });
@@ -185,7 +225,7 @@ export default function AdminPage() {
 
   const startEdit = (p) => {
     setProductForm({
-      id: p.id, name: p.name || '', brand: p.brand || '', category: p.category || '',
+      id: p.id, _mongoId: p._mongoId, name: p.name || '', brand: p.brand || '', category: p.category || '',
       price: p.price || '', oldPrice: p.originalPrice || '', stock: Number(p.stock || 0),
       description: p.description || '', image: p.image || '',
       isFlashSale: !!p.isFlashSale, flashPrice: p.flashPrice || '',
@@ -195,21 +235,21 @@ export default function AdminPage() {
     setSection('products');
   };
 
-  const handleSaveProduct = (e) => {
+  const handleSaveProduct = async (e) => {
     e.preventDefault();
     if (!productForm.name || !productForm.category || !productForm.price || productForm.stock === '' || !productForm.description || !productForm.image) {
       showNotification('Please fill all required fields', 'error');
       return;
     }
-    const id = productForm.id ? Number(productForm.id) : Date.now();
-    const nextStock = Number(productForm.stock || 0);
-    const updated = {
-      ...products.find(p => p.id === id),
-      id, name: productForm.name.trim(), brand: productForm.brand.trim(),
+
+    const productData = {
+      name: productForm.name.trim(),
+      brand: productForm.brand.trim(),
       category: productForm.category.trim().toLowerCase(),
       price: Number(productForm.price),
       originalPrice: productForm.oldPrice ? Number(productForm.oldPrice) : undefined,
-      stock: nextStock, inStock: nextStock > 0,
+      stock: Number(productForm.stock || 0),
+      inStock: Number(productForm.stock || 0) > 0,
       description: productForm.description.trim(),
       image: productForm.image.trim(),
       isFlashSale: productForm.isFlashSale,
@@ -217,6 +257,24 @@ export default function AdminPage() {
       isTopSeller: productForm.isTopSeller,
       isNewArrival: productForm.isNewArrival,
     };
+
+    // Try backend first
+    if (getToken()) {
+      try {
+        if (productForm._mongoId) {
+          await apiAdminUpdateProduct(productForm._mongoId, productData);
+        } else {
+          const created = await apiAdminAddProduct(productData);
+          if (created._id) productData._mongoId = created._id;
+        }
+      } catch (_) {
+        // Fall through to localStorage
+      }
+    }
+
+    // Always update localStorage
+    const id = productForm.id ? Number(productForm.id) : Date.now();
+    const updated = { ...products.find(p => p.id === id), ...productData, id, _mongoId: productForm._mongoId || productData._mongoId };
     const next = [updated, ...products.filter(p => p.id !== id)];
     if (!saveProducts(next)) { showNotification('Failed to save product', 'error'); return; }
     setProducts(next);
@@ -224,18 +282,46 @@ export default function AdminPage() {
     showNotification(productForm.id ? 'Product updated' : 'Product added', 'success');
   };
 
-  const handleDelete = (pid) => {
+  const handleDelete = async (pid) => {
     if (!window.confirm('Delete this product?')) return;
+    const product = products.find(p => p.id === pid);
+
+    // Try backend first
+    if (getToken() && product?._mongoId) {
+      try {
+        await apiAdminDeleteProduct(product._mongoId);
+      } catch (_) {}
+    }
+
+    // Always update localStorage
     const next = products.filter(p => p.id !== pid);
     if (!saveProducts(next)) { showNotification('Failed to delete', 'error'); return; }
     setProducts(next);
     showNotification('Product deleted', 'success');
   };
 
-  const handleOrderStatus = (orderId, status) => {
-    if (!updateOrderStatus(orderId, status)) { showNotification('Failed to update', 'error'); return; }
-    setOrders(getOrders());
-    showNotification('Order updated', 'success');
+  const handleOrderStatus = async (order, status) => {
+    const mongoId = order._id;
+    const localId = order.id;
+
+    // Try backend first
+    if (getToken() && mongoId) {
+      try {
+        await apiAdminUpdateOrderStatus(mongoId, status);
+        // Update local state
+        setOrders(prev => prev.map(o => o._id === mongoId ? { ...o, status } : o));
+        showNotification('Order updated', 'success');
+        return;
+      } catch (_) {}
+    }
+
+    // Fallback to localStorage
+    if (localId && updateOrderStatus(localId, status)) {
+      setOrders(getOrders());
+      showNotification('Order updated', 'success');
+    } else {
+      showNotification('Failed to update', 'error');
+    }
   };
 
   const handleSaveSettings = (e) => {
@@ -259,8 +345,6 @@ export default function AdminPage() {
   return (
     <main>
       <div className="admin-shell">
-
-        {/* ── Sidebar ── */}
         <aside className="admin-sidebar">
           <div className="admin-sidebar-brand">
             <i className="fas fa-crown"></i>
@@ -277,7 +361,6 @@ export default function AdminPage() {
           </nav>
         </aside>
 
-        {/* ── Main content ── */}
         <div className="admin-body">
 
           {/* ══ DASHBOARD ══ */}
@@ -290,14 +373,12 @@ export default function AdminPage() {
                 </div>
                 <span className="admin-date-chip"><i className="fas fa-calendar-alt"></i> {new Date().toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'long' })}</span>
               </div>
-
               <div className="admin-stats-grid">
                 <StatCard icon="fas fa-naira-sign" label="Total Revenue" value={formatCurrency(totalRevenue)} sub="All time" accent="var(--accent-color)" />
                 <StatCard icon="fas fa-receipt" label="Total Orders" value={orders.length} sub={`${pendingOrders} pending`} accent="#3b82f6" />
                 <StatCard icon="fas fa-users" label="Registered Users" value={users.length} sub="Accounts" accent="#22c55e" />
                 <StatCard icon="fas fa-box-open" label="Products" value={products.length} sub={`${products.filter(p => Number(p.stock || 0) < 5).length} low stock`} accent="#8b5cf6" />
               </div>
-
               <div className="admin-dashboard-grid">
                 <div className="admin-card">
                   <div className="admin-card-header">
@@ -306,7 +387,6 @@ export default function AdminPage() {
                   </div>
                   <MiniOrderList orders={recentOrders} />
                 </div>
-
                 <div className="admin-card">
                   <div className="admin-card-header">
                     <h3>Products by Category</h3>
@@ -314,11 +394,8 @@ export default function AdminPage() {
                   </div>
                   <CategoryBar products={products} />
                 </div>
-
                 <div className="admin-card">
-                  <div className="admin-card-header">
-                    <h3>Quick Actions</h3>
-                  </div>
+                  <div className="admin-card-header"><h3>Quick Actions</h3></div>
                   <div className="admin-quick-actions">
                     {[
                       { icon: 'fas fa-plus', label: 'Add Product', action: () => { resetForm(); setShowProductForm(true); setSection('products'); } },
@@ -333,7 +410,6 @@ export default function AdminPage() {
                     ))}
                   </div>
                 </div>
-
                 <div className="admin-card">
                   <div className="admin-card-header">
                     <h3>Low Stock Alert</h3>
@@ -343,10 +419,7 @@ export default function AdminPage() {
                     {products.filter(p => Number(p.stock || 0) < 10 && Number(p.stock || 0) > 0).slice(0, 5).map(p => (
                       <div key={p.id} className="admin-low-stock-row">
                         <img src={p.image} alt={p.name} />
-                        <div>
-                          <strong>{p.name}</strong>
-                          <span>{p.brand}</span>
-                        </div>
+                        <div><strong>{p.name}</strong><span>{p.brand}</span></div>
                         <span className="admin-stock-pill">{p.stock} left</span>
                       </div>
                     ))}
@@ -371,8 +444,6 @@ export default function AdminPage() {
                   <i className="fas fa-plus"></i> Add Product
                 </button>
               </div>
-
-              {/* Product form */}
               {showProductForm && (
                 <div className="admin-card admin-form-card">
                   <div className="admin-card-header">
@@ -381,68 +452,24 @@ export default function AdminPage() {
                   </div>
                   <form onSubmit={handleSaveProduct} className="admin-product-form">
                     <div className="apf-grid">
-                      <div className="form-group">
-                        <label>Product Name *</label>
-                        <input className="form-control" value={productForm.name} onChange={e => pf('name', e.target.value)} placeholder="e.g. Nike Air Force 1" />
-                      </div>
-                      <div className="form-group">
-                        <label>Brand *</label>
-                        <input className="form-control" value={productForm.brand} onChange={e => pf('brand', e.target.value)} placeholder="e.g. Nike" />
-                      </div>
-                      <div className="form-group">
-                        <label>Category *</label>
-                        <input className="form-control" list="admin-cats" value={productForm.category} onChange={e => pf('category', e.target.value)} placeholder="fashion / beauty / lifestyle" />
-                        <datalist id="admin-cats">{categories.map(c => <option key={c} value={c} />)}</datalist>
-                      </div>
-                      <div className="form-group">
-                        <label>Price (₦) *</label>
-                        <input className="form-control" type="number" min="0" value={productForm.price} onChange={e => pf('price', e.target.value)} placeholder="89999" />
-                      </div>
-                      <div className="form-group">
-                        <label>Original Price (₦)</label>
-                        <input className="form-control" type="number" min="0" value={productForm.oldPrice} onChange={e => pf('oldPrice', e.target.value)} placeholder="109999" />
-                      </div>
-                      <div className="form-group">
-                        <label>Stock Quantity *</label>
-                        <input className="form-control" type="number" min="0" value={productForm.stock} onChange={e => pf('stock', e.target.value)} placeholder="50" />
-                      </div>
-                      <div className="form-group apf-full">
-                        <label>Image URL *</label>
-                        <input className="form-control" value={productForm.image} onChange={e => pf('image', e.target.value)} placeholder="https://... or /images/product.jpg" />
-                      </div>
-                      <div className="form-group apf-full">
-                        <label>Description *</label>
-                        <textarea className="form-control" rows="3" value={productForm.description} onChange={e => pf('description', e.target.value)} placeholder="Describe the product..."></textarea>
-                      </div>
+                      <div className="form-group"><label>Product Name *</label><input className="form-control" value={productForm.name} onChange={e => pf('name', e.target.value)} placeholder="e.g. Nike Air Force 1" /></div>
+                      <div className="form-group"><label>Brand *</label><input className="form-control" value={productForm.brand} onChange={e => pf('brand', e.target.value)} placeholder="e.g. Nike" /></div>
+                      <div className="form-group"><label>Category *</label><input className="form-control" list="admin-cats" value={productForm.category} onChange={e => pf('category', e.target.value)} placeholder="fashion / beauty / lifestyle" /><datalist id="admin-cats">{categories.map(c => <option key={c} value={c} />)}</datalist></div>
+                      <div className="form-group"><label>Price (₦) *</label><input className="form-control" type="number" min="0" value={productForm.price} onChange={e => pf('price', e.target.value)} placeholder="89999" /></div>
+                      <div className="form-group"><label>Original Price (₦)</label><input className="form-control" type="number" min="0" value={productForm.oldPrice} onChange={e => pf('oldPrice', e.target.value)} placeholder="109999" /></div>
+                      <div className="form-group"><label>Stock Quantity *</label><input className="form-control" type="number" min="0" value={productForm.stock} onChange={e => pf('stock', e.target.value)} placeholder="50" /></div>
+                      <div className="form-group apf-full"><label>Image URL *</label><input className="form-control" value={productForm.image} onChange={e => pf('image', e.target.value)} placeholder="https://... or /images/product.jpg" /></div>
+                      <div className="form-group apf-full"><label>Description *</label><textarea className="form-control" rows="3" value={productForm.description} onChange={e => pf('description', e.target.value)} placeholder="Describe the product..."></textarea></div>
                     </div>
-
                     <div className="apf-flags">
                       <label className="apf-flag-row">
-                        <div className="apf-flag-toggle">
-                          <input type="checkbox" checked={productForm.isFlashSale} onChange={e => pf('isFlashSale', e.target.checked)} />
-                          <span className="apf-toggle-slider"></span>
-                        </div>
+                        <div className="apf-flag-toggle"><input type="checkbox" checked={productForm.isFlashSale} onChange={e => pf('isFlashSale', e.target.checked)} /><span className="apf-toggle-slider"></span></div>
                         <span><i className="fas fa-bolt" style={{ color: 'var(--accent-color)' }}></i> Flash Sale</span>
-                        {productForm.isFlashSale && (
-                          <input className="form-control apf-flash-price" type="number" min="0" value={productForm.flashPrice} onChange={e => pf('flashPrice', e.target.value)} placeholder="Flash price (₦)" />
-                        )}
+                        {productForm.isFlashSale && (<input className="form-control apf-flash-price" type="number" min="0" value={productForm.flashPrice} onChange={e => pf('flashPrice', e.target.value)} placeholder="Flash price (₦)" />)}
                       </label>
-                      <label className="apf-flag-row">
-                        <div className="apf-flag-toggle">
-                          <input type="checkbox" checked={productForm.isTopSeller} onChange={e => pf('isTopSeller', e.target.checked)} />
-                          <span className="apf-toggle-slider"></span>
-                        </div>
-                        <span><i className="fas fa-fire" style={{ color: '#ef4444' }}></i> Top Seller</span>
-                      </label>
-                      <label className="apf-flag-row">
-                        <div className="apf-flag-toggle">
-                          <input type="checkbox" checked={productForm.isNewArrival} onChange={e => pf('isNewArrival', e.target.checked)} />
-                          <span className="apf-toggle-slider"></span>
-                        </div>
-                        <span><i className="fas fa-star" style={{ color: '#3b82f6' }}></i> New Arrival</span>
-                      </label>
+                      <label className="apf-flag-row"><div className="apf-flag-toggle"><input type="checkbox" checked={productForm.isTopSeller} onChange={e => pf('isTopSeller', e.target.checked)} /><span className="apf-toggle-slider"></span></div><span><i className="fas fa-fire" style={{ color: '#ef4444' }}></i> Top Seller</span></label>
+                      <label className="apf-flag-row"><div className="apf-flag-toggle"><input type="checkbox" checked={productForm.isNewArrival} onChange={e => pf('isNewArrival', e.target.checked)} /><span className="apf-toggle-slider"></span></div><span><i className="fas fa-star" style={{ color: '#3b82f6' }}></i> New Arrival</span></label>
                     </div>
-
                     <div className="apf-actions">
                       <button type="button" className="btn-secondary" onClick={resetForm}>Cancel</button>
                       <button type="submit" className="btn-primary"><i className="fas fa-save"></i> {productForm.id ? 'Update Product' : 'Add Product'}</button>
@@ -450,88 +477,29 @@ export default function AdminPage() {
                   </form>
                 </div>
               )}
-
-              {/* Filters */}
               <div className="admin-filters">
-                <div className="admin-search-wrap">
-                  <i className="fas fa-search"></i>
-                  <input className="admin-search-input" type="text" placeholder="Search by name, brand, category…" value={productSearch} onChange={e => setProductSearch(e.target.value)} />
-                </div>
-                <select className="admin-select" value={categoryFilter} onChange={e => setCategoryFilter(e.target.value)}>
-                  <option value="">All Categories</option>
-                  {categories.map(c => <option key={c} value={c}>{c}</option>)}
-                </select>
-                <select className="admin-select" value={statusFilter} onChange={e => setStatusFilter(e.target.value)}>
-                  <option value="">All Status</option>
-                  <option value="active">Active</option>
-                  <option value="inactive">Inactive</option>
-                  <option value="out-of-stock">Out of Stock</option>
-                </select>
+                <div className="admin-search-wrap"><i className="fas fa-search"></i><input className="admin-search-input" type="text" placeholder="Search by name, brand, category…" value={productSearch} onChange={e => setProductSearch(e.target.value)} /></div>
+                <select className="admin-select" value={categoryFilter} onChange={e => setCategoryFilter(e.target.value)}><option value="">All Categories</option>{categories.map(c => <option key={c} value={c}>{c}</option>)}</select>
+                <select className="admin-select" value={statusFilter} onChange={e => setStatusFilter(e.target.value)}><option value="">All Status</option><option value="active">Active</option><option value="inactive">Inactive</option><option value="out-of-stock">Out of Stock</option></select>
               </div>
-
-              {/* Product table */}
               <div className="admin-card admin-table-card">
                 <div className="admin-table-wrap">
                   <table className="admin-table">
-                    <thead>
-                      <tr>
-                        <th>Product</th>
-                        <th>Category</th>
-                        <th>Price</th>
-                        <th>Stock</th>
-                        <th>Tags</th>
-                        <th>Status</th>
-                        <th>Actions</th>
-                      </tr>
-                    </thead>
+                    <thead><tr><th>Product</th><th>Category</th><th>Price</th><th>Stock</th><th>Tags</th><th>Status</th><th>Actions</th></tr></thead>
                     <tbody>
-                      {filteredProducts.length === 0 && (
-                        <tr><td colSpan="7" className="admin-table-empty"><i className="fas fa-box-open"></i> No products found</td></tr>
-                      )}
+                      {filteredProducts.length === 0 && (<tr><td colSpan="7" className="admin-table-empty"><i className="fas fa-box-open"></i> No products found</td></tr>)}
                       {filteredProducts.map(p => {
                         const st = getProductStatus(p);
                         const stockNum = Number(p.stock || 0);
                         return (
                           <tr key={p.id}>
-                            <td>
-                              <div className="admin-product-cell">
-                                <img src={p.image} alt={p.name} className="admin-product-thumb" />
-                                <div>
-                                  <strong>{p.name}</strong>
-                                  <span>{p.brand}</span>
-                                </div>
-                              </div>
-                            </td>
+                            <td><div className="admin-product-cell"><img src={p.image} alt={p.name} className="admin-product-thumb" /><div><strong>{p.name}</strong><span>{p.brand}</span></div></div></td>
                             <td><span className="admin-cat-pill">{p.category}</span></td>
-                            <td>
-                              <div className="admin-price-cell">
-                                <strong>{formatCurrency(p.price || 0)}</strong>
-                                {p.originalPrice && <s>{formatCurrency(p.originalPrice)}</s>}
-                              </div>
-                            </td>
-                            <td>
-                              <span className={`admin-stock-badge ${stockNum <= 0 ? 'empty' : stockNum < 10 ? 'low' : stockNum < 30 ? 'medium' : 'good'}`}>
-                                {stockNum}
-                              </span>
-                            </td>
-                            <td>
-                              <div className="admin-tag-pills">
-                                {p.isFlashSale && <span className="admin-tag flash"><i className="fas fa-bolt"></i></span>}
-                                {p.isTopSeller && <span className="admin-tag top"><i className="fas fa-fire"></i></span>}
-                                {p.isNewArrival && <span className="admin-tag new"><i className="fas fa-star"></i></span>}
-                              </div>
-                            </td>
-                            <td>
-                              <span className={`admin-prod-status ${st}`}>
-                                {st === 'active' ? 'Active' : st === 'inactive' ? 'Inactive' : 'Out of Stock'}
-                              </span>
-                            </td>
-                            <td>
-                              <div className="admin-row-actions">
-                                <button className="admin-action-btn edit" onClick={() => startEdit(p)} title="Edit"><i className="fas fa-edit"></i></button>
-                                <button className="admin-action-btn delete" onClick={() => handleDelete(p.id)} title="Delete"><i className="fas fa-trash"></i></button>
-                              </div>
-                            </td>
+                            <td><div className="admin-price-cell"><strong>{formatCurrency(p.price || 0)}</strong>{p.originalPrice && <s>{formatCurrency(p.originalPrice)}</s>}</div></td>
+                            <td><span className={`admin-stock-badge ${stockNum <= 0 ? 'empty' : stockNum < 10 ? 'low' : stockNum < 30 ? 'medium' : 'good'}`}>{stockNum}</span></td>
+                            <td><div className="admin-tag-pills">{p.isFlashSale && <span className="admin-tag flash"><i className="fas fa-bolt"></i></span>}{p.isTopSeller && <span className="admin-tag top"><i className="fas fa-fire"></i></span>}{p.isNewArrival && <span className="admin-tag new"><i className="fas fa-star"></i></span>}</div></td>
+                            <td><span className={`admin-prod-status ${st}`}>{st === 'active' ? 'Active' : st === 'inactive' ? 'Inactive' : 'Out of Stock'}</span></td>
+                            <td><div className="admin-row-actions"><button className="admin-action-btn edit" onClick={() => startEdit(p)} title="Edit"><i className="fas fa-edit"></i></button><button className="admin-action-btn delete" onClick={() => handleDelete(p.id)} title="Delete"><i className="fas fa-trash"></i></button></div></td>
                           </tr>
                         );
                       })}
@@ -546,10 +514,7 @@ export default function AdminPage() {
           {section === 'orders' && (
             <div className="admin-page">
               <div className="admin-page-header">
-                <div>
-                  <h1>Orders</h1>
-                  <p className="admin-page-sub">{filteredOrders.length} of {orders.length} orders</p>
-                </div>
+                <div><h1>Orders</h1><p className="admin-page-sub">{filteredOrders.length} of {orders.length} orders</p></div>
                 <div className="admin-order-stats-row">
                   {Object.entries(STATUS_META).map(([key, m]) => (
                     <span key={key} className="admin-mini-stat" style={{ color: m.color, background: m.bg }}>
@@ -558,113 +523,33 @@ export default function AdminPage() {
                   ))}
                 </div>
               </div>
-
               <div className="admin-filters">
-                <div className="admin-search-wrap">
-                  <i className="fas fa-search"></i>
-                  <input className="admin-search-input" type="text" placeholder="Search by order ID, name, or email…" value={orderSearch} onChange={e => setOrderSearch(e.target.value)} />
-                </div>
-                <select className="admin-select" value={orderStatusFilter} onChange={e => setOrderStatusFilter(e.target.value)}>
-                  <option value="">All Statuses</option>
-                  {Object.entries(STATUS_META).map(([k, m]) => <option key={k} value={k}>{m.label}</option>)}
-                </select>
-              </div>
-
-              <div className="admin-card admin-table-card">
-                <div className="admin-table-wrap">
-                  <table className="admin-table">
-                    <thead>
-                      <tr>
-                        <th>Order</th>
-                        <th>Customer</th>
-                        <th>Date</th>
-                        <th>Items</th>
-                        <th>Total</th>
-                        <th>Status</th>
-                        <th>Update</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {filteredOrders.length === 0 && (
-                        <tr><td colSpan="7" className="admin-table-empty"><i className="fas fa-receipt"></i> No orders found</td></tr>
-                      )}
-                      {filteredOrders.map(o => (
-                        <tr key={o.id}>
-                          <td><strong>#{o.id}</strong></td>
-                          <td>
-                            <div className="admin-customer-cell">
-                              <div className="admin-customer-avatar">{(o.userName || o.userEmail || 'G')[0].toUpperCase()}</div>
-                              <div>
-                                <strong>{o.userName || 'Guest'}</strong>
-                                <span>{o.userEmail || '—'}</span>
-                              </div>
-                            </div>
-                          </td>
-                          <td>{formatDate(o.createdAt || o.orderDate)}</td>
-                          <td><span className="admin-items-count">{(o.items || []).reduce((s, it) => s + (it.quantity || 1), 0)} items</span></td>
-                          <td><strong>{formatCurrency(o.total || 0)}</strong></td>
-                          <td><StatusBadge status={o.status || 'pending'} /></td>
-                          <td>
-                            <select className="admin-select admin-status-select" value={o.status || 'pending'} onChange={e => handleOrderStatus(o.id, e.target.value)}>
-                              {Object.entries(STATUS_META).map(([k, m]) => <option key={k} value={k}>{m.label}</option>)}
-                            </select>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* ══ USERS ══ */}
-          {section === 'users' && (
-            <div className="admin-page">
-              <div className="admin-page-header">
-                <div>
-                  <h1>Users</h1>
-                  <p className="admin-page-sub">{users.length} registered accounts</p>
-                </div>
+                <div className="admin-search-wrap"><i className="fas fa-search"></i><input className="admin-search-input" type="text" placeholder="Search by order ID, name, or email…" value={orderSearch} onChange={e => setOrderSearch(e.target.value)} /></div>
+                <select className="admin-select" value={orderStatusFilter} onChange={e => setOrderStatusFilter(e.target.value)}><option value="">All Statuses</option>{Object.entries(STATUS_META).map(([k, m]) => <option key={k} value={k}>{m.label}</option>)}</select>
               </div>
               <div className="admin-card admin-table-card">
                 <div className="admin-table-wrap">
                   <table className="admin-table">
-                    <thead>
-                      <tr>
-                        <th>User</th>
-                        <th>Email</th>
-                        <th>Role</th>
-                        <th>Joined</th>
-                        <th>Orders</th>
-                        <th>Status</th>
-                      </tr>
-                    </thead>
+                    <thead><tr><th>Order</th><th>Customer</th><th>Date</th><th>Items</th><th>Total</th><th>Status</th><th>Update</th></tr></thead>
                     <tbody>
-                      {users.length === 0 && (
-                        <tr><td colSpan="6" className="admin-table-empty"><i className="fas fa-users"></i> No users yet</td></tr>
-                      )}
-                      {users.map(u => {
-                        const userOrders = orders.filter(o => (o.userEmail || '').toLowerCase() === (u.email || '').toLowerCase());
+                      {filteredOrders.length === 0 && (<tr><td colSpan="7" className="admin-table-empty"><i className="fas fa-receipt"></i> No orders found</td></tr>)}
+                      {filteredOrders.map(o => {
+                        const customer = o.user?.name || o.userName || o.user?.email || o.userEmail || 'Guest';
+                        const email = o.user?.email || o.userEmail || '—';
+                        const orderId = o._id || o.id;
                         return (
-                          <tr key={u.id || u.email}>
+                          <tr key={orderId}>
+                            <td><strong>#{String(orderId).slice(-8)}</strong></td>
+                            <td><div className="admin-customer-cell"><div className="admin-customer-avatar">{customer[0].toUpperCase()}</div><div><strong>{customer}</strong><span>{email}</span></div></div></td>
+                            <td>{formatDate(o.createdAt || o.orderDate)}</td>
+                            <td><span className="admin-items-count">{(o.items || []).reduce((s, it) => s + (it.quantity || 1), 0)} items</span></td>
+                            <td><strong>{formatCurrency(o.total || 0)}</strong></td>
+                            <td><StatusBadge status={o.status || 'pending'} /></td>
                             <td>
-                              <div className="admin-customer-cell">
-                                <div className="admin-customer-avatar" style={u.role === 'admin' ? { background: 'var(--accent-color)', color: 'var(--primary-color)' } : {}}>
-                                  {(u.name || u.email || 'U')[0].toUpperCase()}
-                                </div>
-                                <strong>{u.name || '—'}</strong>
-                              </div>
+                              <select className="admin-select admin-status-select" value={o.status || 'pending'} onChange={e => handleOrderStatus(o, e.target.value)}>
+                                {Object.entries(STATUS_META).map(([k, m]) => <option key={k} value={k}>{m.label}</option>)}
+                              </select>
                             </td>
-                            <td>{u.email || '—'}</td>
-                            <td>
-                              <span className={`admin-role-badge ${u.role === 'admin' ? 'admin' : 'user'}`}>
-                                {u.role === 'admin' ? <><i className="fas fa-crown"></i> Admin</> : <><i className="fas fa-user"></i> User</>}
-                              </span>
-                            </td>
-                            <td>{formatDate(u.createdAt || u.joinedDate)}</td>
-                            <td><span className="admin-items-count">{userOrders.length} orders</span></td>
-                            <td><span className="admin-prod-status active">Active</span></td>
                           </tr>
                         );
                       })}
@@ -675,22 +560,42 @@ export default function AdminPage() {
             </div>
           )}
 
+          {/* ══ USERS ══ */}
+          {section === 'users' && (
+            <div className="admin-page">
+              <div className="admin-page-header"><div><h1>Users</h1><p className="admin-page-sub">{users.length} registered accounts</p></div></div>
+              <div className="admin-card admin-table-card">
+                <div className="admin-table-wrap">
+                  <table className="admin-table">
+                    <thead><tr><th>User</th><th>Email</th><th>Role</th><th>Joined</th><th>Status</th></tr></thead>
+                    <tbody>
+                      {users.length === 0 && (<tr><td colSpan="5" className="admin-table-empty"><i className="fas fa-users"></i> No users yet</td></tr>)}
+                      {users.map(u => (
+                        <tr key={u._id || u.id || u.email}>
+                          <td><div className="admin-customer-cell"><div className="admin-customer-avatar" style={u.role === 'admin' ? { background: 'var(--accent-color)', color: 'var(--primary-color)' } : {}}>{(u.name || u.email || 'U')[0].toUpperCase()}</div><strong>{u.name || '—'}</strong></div></td>
+                          <td>{u.email || '—'}</td>
+                          <td><span className={`admin-role-badge ${u.role === 'admin' ? 'admin' : 'user'}`}>{u.role === 'admin' ? <><i className="fas fa-crown"></i> Admin</> : <><i className="fas fa-user"></i> User</>}</span></td>
+                          <td>{formatDate(u.createdAt || u.joinedDate)}</td>
+                          <td><span className="admin-prod-status active">Active</span></td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* ══ ANALYTICS ══ */}
           {section === 'analytics' && (
             <div className="admin-page">
-              <div className="admin-page-header">
-                <div>
-                  <h1>Analytics</h1>
-                  <p className="admin-page-sub">Store performance overview</p>
-                </div>
-              </div>
+              <div className="admin-page-header"><div><h1>Analytics</h1><p className="admin-page-sub">Store performance overview</p></div></div>
               <div className="admin-stats-grid">
                 <StatCard icon="fas fa-naira-sign" label="Total Revenue" value={formatCurrency(totalRevenue)} sub="All orders" accent="var(--accent-color)" />
                 <StatCard icon="fas fa-shopping-bag" label="Avg. Order Value" value={orders.length ? formatCurrency(Math.round(totalRevenue / orders.length)) : '₦0'} sub="Per order" accent="#3b82f6" />
                 <StatCard icon="fas fa-box-open" label="Products Listed" value={products.length} sub="In catalog" accent="#8b5cf6" />
                 <StatCard icon="fas fa-star" label="Flash Sale Items" value={products.filter(p => p.isFlashSale).length} sub="On sale now" accent="#ef4444" />
               </div>
-
               <div className="admin-analytics-grid">
                 <div className="admin-card">
                   <div className="admin-card-header"><h3>Order Status Breakdown</h3></div>
@@ -702,38 +607,23 @@ export default function AdminPage() {
                         <div key={key} className="admin-donut-row">
                           <span className="admin-donut-dot" style={{ background: m.color }}></span>
                           <span className="admin-donut-label">{m.label}</span>
-                          <div className="admin-donut-track">
-                            <div className="admin-donut-fill" style={{ width: `${pct}%`, background: m.color }}></div>
-                          </div>
+                          <div className="admin-donut-track"><div className="admin-donut-fill" style={{ width: `${pct}%`, background: m.color }}></div></div>
                           <span className="admin-donut-val">{count}</span>
                         </div>
                       );
                     })}
-                    {orders.length === 0 && <p className="admin-empty-msg">No orders yet — place some orders to see stats.</p>}
+                    {orders.length === 0 && <p className="admin-empty-msg">No orders yet.</p>}
                   </div>
                 </div>
-
-                <div className="admin-card">
-                  <div className="admin-card-header"><h3>Products by Category</h3></div>
-                  <CategoryBar products={products} />
-                </div>
-
+                <div className="admin-card"><div className="admin-card-header"><h3>Products by Category</h3></div><CategoryBar products={products} /></div>
                 <div className="admin-card">
                   <div className="admin-card-header"><h3>Top Products by Stock</h3></div>
                   <div className="admin-top-products">
                     {[...products].sort((a, b) => Number(b.stock || 0) - Number(a.stock || 0)).slice(0, 6).map(p => (
-                      <div key={p.id} className="admin-top-prod-row">
-                        <img src={p.image} alt={p.name} />
-                        <div>
-                          <strong>{p.name}</strong>
-                          <span>{p.brand}</span>
-                        </div>
-                        <span className="admin-stock-pill">{p.stock} units</span>
-                      </div>
+                      <div key={p.id} className="admin-top-prod-row"><img src={p.image} alt={p.name} /><div><strong>{p.name}</strong><span>{p.brand}</span></div><span className="admin-stock-pill">{p.stock} units</span></div>
                     ))}
                   </div>
                 </div>
-
                 <div className="admin-card">
                   <div className="admin-card-header"><h3>Catalog Health</h3></div>
                   <div className="admin-health-grid">
@@ -744,90 +634,47 @@ export default function AdminPage() {
                       { label: 'On Flash Sale', value: products.filter(p => p.isFlashSale).length, color: 'var(--accent-color)', icon: 'fas fa-bolt' },
                       { label: 'Top Sellers', value: products.filter(p => p.isTopSeller).length, color: '#8b5cf6', icon: 'fas fa-fire' },
                       { label: 'New Arrivals', value: products.filter(p => p.isNewArrival).length, color: '#3b82f6', icon: 'fas fa-star' },
-                    ].map(h => (
-                      <div key={h.label} className="admin-health-item">
-                        <i className={h.icon} style={{ color: h.color }}></i>
-                        <strong style={{ color: h.color }}>{h.value}</strong>
-                        <span>{h.label}</span>
-                      </div>
-                    ))}
+                    ].map(h => (<div key={h.label} className="admin-health-item"><i className={h.icon} style={{ color: h.color }}></i><strong style={{ color: h.color }}>{h.value}</strong><span>{h.label}</span></div>))}
                   </div>
                 </div>
               </div>
             </div>
           )}
 
-
           {/* ══ PROMOS ══ */}
           {section === 'promos' && (
             <div className="admin-page">
               <div className="admin-page-header">
-                <div>
-                  <h1>Promo Codes</h1>
-                  <p className="admin-page-sub">{promoCodes.length} codes · {promoCodes.filter(p => p.active).length} active</p>
-                </div>
-                <button className="btn-primary" onClick={() => { setPromoForm({ code: '', type: 'percentage', value: '', description: '', minOrderValue: 0, active: true }); setShowPromoForm(true); }}>
-                  <i className="fas fa-plus"></i> New Code
-                </button>
+                <div><h1>Promo Codes</h1><p className="admin-page-sub">{promoCodes.length} codes · {promoCodes.filter(p => p.active).length} active</p></div>
+                <button className="btn-primary" onClick={() => { setPromoForm({ code: '', type: 'percentage', value: '', description: '', minOrderValue: 0, active: true }); setShowPromoForm(true); }}><i className="fas fa-plus"></i> New Code</button>
               </div>
-
               {showPromoForm && (
                 <div className="admin-card admin-form-card">
-                  <div className="admin-card-header">
-                    <h3><i className="fas fa-tag"></i> Create Promo Code</h3>
-                    <button className="admin-close-btn" onClick={() => setShowPromoForm(false)}><i className="fas fa-times"></i></button>
-                  </div>
+                  <div className="admin-card-header"><h3><i className="fas fa-tag"></i> Create Promo Code</h3><button className="admin-close-btn" onClick={() => setShowPromoForm(false)}><i className="fas fa-times"></i></button></div>
                   <form className="admin-product-form" onSubmit={e => {
                     e.preventDefault();
                     if (!promoForm.code || !promoForm.value || !promoForm.description) { showNotification('Fill all fields', 'error'); return; }
                     const existing = promoCodes.find(p => p.code === promoForm.code.toUpperCase().trim());
                     if (existing) { showNotification('Code already exists', 'error'); return; }
                     const next = [...promoCodes, { ...promoForm, code: promoForm.code.toUpperCase().trim(), value: Number(promoForm.value), minOrderValue: Number(promoForm.minOrderValue || 0) }];
-                    savePromoCodes(next);
-                    setPromoCodes(next);
-                    setShowPromoForm(false);
+                    savePromoCodes(next); setPromoCodes(next); setShowPromoForm(false);
                     showNotification('Promo code created', 'success');
                   }}>
                     <div className="apf-grid">
-                      <div className="form-group">
-                        <label>Code *</label>
-                        <input className="form-control" value={promoForm.code} onChange={e => setPromoForm(p => ({...p, code: e.target.value.toUpperCase()}))} placeholder="SAVE20" style={{fontFamily:'monospace',fontWeight:700}} />
-                      </div>
-                      <div className="form-group">
-                        <label>Type *</label>
-                        <select className="form-control admin-select" value={promoForm.type} onChange={e => setPromoForm(p => ({...p, type: e.target.value}))}>
-                          <option value="percentage">Percentage (%)</option>
-                          <option value="fixed">Fixed Amount (₦)</option>
-                          <option value="shipping">Free Shipping</option>
-                        </select>
-                      </div>
-                      <div className="form-group">
-                        <label>Value * {promoForm.type === 'percentage' ? '(%)' : promoForm.type === 'fixed' ? '(₦)' : '(leave 0)'}</label>
-                        <input className="form-control" type="number" min="0" value={promoForm.value} onChange={e => setPromoForm(p => ({...p, value: e.target.value}))} placeholder={promoForm.type === 'percentage' ? '10' : '5000'} />
-                      </div>
-                      <div className="form-group">
-                        <label>Min Order Value (₦)</label>
-                        <input className="form-control" type="number" min="0" value={promoForm.minOrderValue} onChange={e => setPromoForm(p => ({...p, minOrderValue: e.target.value}))} placeholder="0" />
-                      </div>
-                      <div className="form-group apf-full">
-                        <label>Description *</label>
-                        <input className="form-control" value={promoForm.description} onChange={e => setPromoForm(p => ({...p, description: e.target.value}))} placeholder="e.g. 10% off your order" />
-                      </div>
+                      <div className="form-group"><label>Code *</label><input className="form-control" value={promoForm.code} onChange={e => setPromoForm(p => ({...p, code: e.target.value.toUpperCase()}))} placeholder="SAVE20" style={{fontFamily:'monospace',fontWeight:700}} /></div>
+                      <div className="form-group"><label>Type *</label><select className="form-control admin-select" value={promoForm.type} onChange={e => setPromoForm(p => ({...p, type: e.target.value}))}><option value="percentage">Percentage (%)</option><option value="fixed">Fixed Amount (₦)</option><option value="shipping">Free Shipping</option></select></div>
+                      <div className="form-group"><label>Value *</label><input className="form-control" type="number" min="0" value={promoForm.value} onChange={e => setPromoForm(p => ({...p, value: e.target.value}))} /></div>
+                      <div className="form-group"><label>Min Order Value (₦)</label><input className="form-control" type="number" min="0" value={promoForm.minOrderValue} onChange={e => setPromoForm(p => ({...p, minOrderValue: e.target.value}))} placeholder="0" /></div>
+                      <div className="form-group apf-full"><label>Description *</label><input className="form-control" value={promoForm.description} onChange={e => setPromoForm(p => ({...p, description: e.target.value}))} placeholder="e.g. 10% off your order" /></div>
                     </div>
-                    <div className="apf-actions">
-                      <button type="button" className="btn-secondary" onClick={() => setShowPromoForm(false)}>Cancel</button>
-                      <button type="submit" className="btn-primary"><i className="fas fa-save"></i> Create Code</button>
-                    </div>
+                    <div className="apf-actions"><button type="button" className="btn-secondary" onClick={() => setShowPromoForm(false)}>Cancel</button><button type="submit" className="btn-primary"><i className="fas fa-save"></i> Create Code</button></div>
                   </form>
                 </div>
               )}
-
               <div className="admin-card admin-table-card">
                 <div className="admin-table-wrap">
                   <table className="admin-table">
-                    <thead>
-                      <tr><th>Code</th><th>Type</th><th>Value</th><th>Min Order</th><th>Description</th><th>Status</th><th>Actions</th></tr>
-                    </thead>
+                    <thead><tr><th>Code</th><th>Type</th><th>Value</th><th>Min Order</th><th>Description</th><th>Status</th><th>Actions</th></tr></thead>
                     <tbody>
                       {promoCodes.length === 0 && <tr><td colSpan="7" className="admin-table-empty">No promo codes yet</td></tr>}
                       {promoCodes.map((p, i) => (
@@ -837,21 +684,11 @@ export default function AdminPage() {
                           <td><strong>{p.type === 'percentage' ? p.value + '%' : p.type === 'fixed' ? formatCurrency(p.value) : 'Free'}</strong></td>
                           <td>{p.minOrderValue > 0 ? formatCurrency(p.minOrderValue) : '—'}</td>
                           <td style={{maxWidth:'200px',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{p.description}</td>
-                          <td>
-                            <span className={`admin-prod-status ${p.active ? 'active' : 'inactive'}`}>{p.active ? 'Active' : 'Inactive'}</span>
-                          </td>
+                          <td><span className={`admin-prod-status ${p.active ? 'active' : 'inactive'}`}>{p.active ? 'Active' : 'Inactive'}</span></td>
                           <td>
                             <div className="admin-row-actions">
-                              <button className="admin-action-btn edit" title={p.active ? 'Deactivate' : 'Activate'} onClick={() => {
-                                const next = promoCodes.map((c,j) => j===i ? {...c, active: !c.active} : c);
-                                savePromoCodes(next); setPromoCodes(next);
-                              }}><i className={p.active ? 'fas fa-pause' : 'fas fa-play'}></i></button>
-                              <button className="admin-action-btn delete" title="Delete" onClick={() => {
-                                if (!confirm('Delete this promo code?')) return;
-                                const next = promoCodes.filter((_,j) => j!==i);
-                                savePromoCodes(next); setPromoCodes(next);
-                                showNotification('Promo code deleted', 'success');
-                              }}><i className="fas fa-trash"></i></button>
+                              <button className="admin-action-btn edit" onClick={() => { const next = promoCodes.map((c,j) => j===i ? {...c, active: !c.active} : c); savePromoCodes(next); setPromoCodes(next); }}><i className={p.active ? 'fas fa-pause' : 'fas fa-play'}></i></button>
+                              <button className="admin-action-btn delete" onClick={() => { if (!confirm('Delete this promo code?')) return; const next = promoCodes.filter((_,j) => j!==i); savePromoCodes(next); setPromoCodes(next); showNotification('Promo code deleted', 'success'); }}><i className="fas fa-trash"></i></button>
                             </div>
                           </td>
                         </tr>
@@ -860,23 +697,14 @@ export default function AdminPage() {
                   </table>
                 </div>
               </div>
-
               <div className="admin-card" style={{marginTop:'1rem'}}>
-                <div className="admin-card-header">
-                  <h3><i className="fas fa-envelope"></i> Newsletter Subscribers</h3>
-                  <span className="admin-card-hint">{newsletter.length} subscribers</span>
-                </div>
+                <div className="admin-card-header"><h3><i className="fas fa-envelope"></i> Newsletter Subscribers</h3><span className="admin-card-hint">{newsletter.length} subscribers</span></div>
                 <div className="admin-table-wrap">
                   <table className="admin-table">
                     <thead><tr><th>Email</th><th>Subscribed</th></tr></thead>
                     <tbody>
                       {newsletter.length === 0 && <tr><td colSpan="2" className="admin-table-empty"><i className="fas fa-envelope"></i> No subscribers yet</td></tr>}
-                      {newsletter.map(s => (
-                        <tr key={s.email}>
-                          <td>{s.email}</td>
-                          <td>{new Date(s.subscribedAt).toLocaleDateString('en-GB', {day:'numeric',month:'short',year:'numeric'})}</td>
-                        </tr>
-                      ))}
+                      {newsletter.map(s => (<tr key={s.email}><td>{s.email}</td><td>{new Date(s.subscribedAt).toLocaleDateString('en-GB', {day:'numeric',month:'short',year:'numeric'})}</td></tr>))}
                     </tbody>
                   </table>
                 </div>
@@ -887,32 +715,17 @@ export default function AdminPage() {
           {/* ══ SETTINGS ══ */}
           {section === 'settings' && (
             <div className="admin-page">
-              <div className="admin-page-header">
-                <div>
-                  <h1>Settings</h1>
-                  <p className="admin-page-sub">Manage your store configuration</p>
-                </div>
-              </div>
+              <div className="admin-page-header"><div><h1>Settings</h1><p className="admin-page-sub">Manage your store configuration</p></div></div>
               <div className="admin-settings-grid">
                 <div className="admin-card">
                   <div className="admin-card-header"><h3><i className="fas fa-store"></i> Store Information</h3></div>
                   <form onSubmit={handleSaveSettings} className="admin-settings-form">
-                    <div className="form-group">
-                      <label>Store Name</label>
-                      <input className="form-control" value={settings.siteName || ''} onChange={e => setSettings(p => ({ ...p, siteName: e.target.value }))} placeholder="LUXORA" />
-                    </div>
-                    <div className="form-group">
-                      <label>Store Description</label>
-                      <textarea className="form-control" rows="3" value={settings.siteDescription || ''} onChange={e => setSettings(p => ({ ...p, siteDescription: e.target.value }))} placeholder="Your store tagline..."></textarea>
-                    </div>
-                    <div className="form-group">
-                      <label>Contact Email</label>
-                      <input className="form-control" type="email" value={settings.contactEmail || ''} onChange={e => setSettings(p => ({ ...p, contactEmail: e.target.value }))} placeholder="hello@luxora.com" />
-                    </div>
+                    <div className="form-group"><label>Store Name</label><input className="form-control" value={settings.siteName || ''} onChange={e => setSettings(p => ({ ...p, siteName: e.target.value }))} placeholder="LUXORA" /></div>
+                    <div className="form-group"><label>Store Description</label><textarea className="form-control" rows="3" value={settings.siteDescription || ''} onChange={e => setSettings(p => ({ ...p, siteDescription: e.target.value }))} placeholder="Your store tagline..."></textarea></div>
+                    <div className="form-group"><label>Contact Email</label><input className="form-control" type="email" value={settings.contactEmail || ''} onChange={e => setSettings(p => ({ ...p, contactEmail: e.target.value }))} placeholder="hello@luxora.com" /></div>
                     <button type="submit" className="btn-primary"><i className="fas fa-save"></i> Save Changes</button>
                   </form>
                 </div>
-
                 <div className="admin-card">
                   <div className="admin-card-header"><h3><i className="fas fa-bell"></i> Notifications</h3></div>
                   <form onSubmit={handleSaveSettings} className="admin-settings-form">
@@ -922,20 +735,13 @@ export default function AdminPage() {
                       { key: 'dailyReports', label: 'Daily sales digest', icon: 'fas fa-chart-bar' },
                     ].map(item => (
                       <div key={item.key} className="admin-toggle-row">
-                        <div className="admin-toggle-label">
-                          <i className={item.icon}></i>
-                          <span>{item.label}</span>
-                        </div>
-                        <label className="switch">
-                          <input type="checkbox" checked={!!settings[item.key]} onChange={e => setSettings(p => ({ ...p, [item.key]: e.target.checked }))} />
-                          <span className="slider"></span>
-                        </label>
+                        <div className="admin-toggle-label"><i className={item.icon}></i><span>{item.label}</span></div>
+                        <label className="switch"><input type="checkbox" checked={!!settings[item.key]} onChange={e => setSettings(p => ({ ...p, [item.key]: e.target.checked }))} /><span className="slider"></span></label>
                       </div>
                     ))}
                     <button type="submit" className="btn-primary"><i className="fas fa-save"></i> Save Settings</button>
                   </form>
                 </div>
-
                 <div className="admin-card">
                   <div className="admin-card-header"><h3><i className="fas fa-info-circle"></i> System Info</h3></div>
                   <div className="admin-sys-info">
@@ -944,14 +750,9 @@ export default function AdminPage() {
                       { label: 'Total Orders', value: orders.length },
                       { label: 'Total Users', value: users.length },
                       { label: 'Total Revenue', value: formatCurrency(totalRevenue) },
-                      { label: 'Backend', value: 'Mock (localStorage)' },
-                      { label: 'Version', value: '2.0.0' },
-                    ].map(row => (
-                      <div key={row.label} className="admin-sys-row">
-                        <span>{row.label}</span>
-                        <strong>{row.value}</strong>
-                      </div>
-                    ))}
+                      { label: 'Backend', value: 'MongoDB Atlas' },
+                      { label: 'Version', value: '3.0.0' },
+                    ].map(row => (<div key={row.label} className="admin-sys-row"><span>{row.label}</span><strong>{row.value}</strong></div>))}
                   </div>
                 </div>
               </div>

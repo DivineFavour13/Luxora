@@ -2,40 +2,118 @@ import { useEffect, useMemo, useState } from 'react';
 import { usePageMeta } from '../hooks/usePageMeta.js';
 import { Link, useNavigate } from 'react-router-dom';
 import {
-  getCart,
-  saveCart,
-  updateCartQuantity,
-  removeFromCart,
-  clearCart,
-  getCartItemCount,
-  getRecentlyViewed,
-  getProducts,
-  getCurrentUser,
-  getProductById,
-  createOrder,
-  saveProducts,
-  getUserAddresses,
-  getUserPayments,
-  getPromoCodes
+  getCart, saveCart, updateCartQuantity, removeFromCart, clearCart,
+  getCartItemCount, getRecentlyViewed, getProducts, getCurrentUser,
+  getProductById, createOrder, saveProducts, getUserAddresses,
+  getUserPayments, getPromoCodes
 } from '../utils/storage.js';
 import { formatCurrency } from '../utils/format.js';
 import { showNotification } from '../utils/notifications.js';
-import { apiCreateOrder, getToken } from '../utils/api.js';
+import { apiCreateOrder, apiCreatePaymentIntent, getToken } from '../utils/api.js';
+import { loadStripe } from '@stripe/stripe-js';
+import { Elements, CardElement, useStripe, useElements } from '@stripe/react-stripe-js';
+
+const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY);
+
+// Stripe card payment form
+function StripeCardForm({ total, onPaymentSuccess, onCancel }) {
+  const stripe = useStripe();
+  const elements = useElements();
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+
+  const handlePay = async () => {
+    if (!stripe || !elements) return;
+    setLoading(true);
+    setError('');
+
+    try {
+      // Create payment intent on backend
+      const { clientSecret, amountUSD, error: intentError } = await apiCreatePaymentIntent(total);
+      if (intentError) { setError(intentError); setLoading(false); return; }
+
+      // Confirm card payment with Stripe
+      const { error: stripeError, paymentIntent } = await stripe.confirmCardPayment(clientSecret, {
+        payment_method: { card: elements.getElement(CardElement) },
+      });
+
+      if (stripeError) {
+        setError(stripeError.message);
+        setLoading(false);
+        return;
+      }
+
+      if (paymentIntent.status === 'succeeded') {
+        onPaymentSuccess(`Stripe Card (≈$${amountUSD} USD)`);
+      }
+    } catch (err) {
+      setError('Payment failed. Please try again.');
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="stripe-card-wrap">
+      <div className="stripe-card-info">
+        <i className="fas fa-lock" style={{ color: 'var(--accent-color)' }}></i>
+        <span>Secured by Stripe</span>
+        <div className="payment-icons" style={{ display: 'flex', gap: '0.5rem', marginLeft: 'auto' }}>
+          <i className="fab fa-cc-visa" style={{ fontSize: '1.4rem', color: '#1a1f71' }}></i>
+          <i className="fab fa-cc-mastercard" style={{ fontSize: '1.4rem', color: '#eb001b' }}></i>
+        </div>
+      </div>
+
+      <div className="stripe-card-element-wrap">
+        <CardElement options={{
+          style: {
+            base: {
+              fontSize: '16px',
+              color: '#1a1a2e',
+              '::placeholder': { color: '#aaa' },
+            },
+            invalid: { color: '#ef4444' },
+          }
+        }} />
+      </div>
+
+      <div className="stripe-test-hint">
+        <i className="fas fa-info-circle"></i>
+        Test card: <code>4242 4242 4242 4242</code> · Any future date · Any 3-digit CVV
+      </div>
+
+      {error && (
+        <div className="stripe-error">
+          <i className="fas fa-exclamation-circle"></i> {error}
+        </div>
+      )}
+
+      <div className="checkout-nav-btns" style={{ marginTop: '1rem' }}>
+        <button className="btn-outline" onClick={onCancel} disabled={loading}>
+          <i className="fas fa-arrow-left"></i> Back
+        </button>
+        <button className="btn-primary" onClick={handlePay} disabled={loading || !stripe}>
+          {loading
+            ? <><i className="fas fa-spinner fa-spin"></i> Processing...</>
+            : <><i className="fas fa-lock"></i> Pay & Place Order · {formatCurrency(total)}</>
+          }
+        </button>
+      </div>
+    </div>
+  );
+}
 
 function CheckoutModal({ cart, subtotal, shipping, discount, total, onClose, onConfirm }) {
   const user = getCurrentUser();
   const savedAddresses = user ? getUserAddresses(user) : [];
   const savedCards = user ? getUserPayments(user) : [];
 
-  const [step, setStep] = useState(1); // 1=address, 2=payment, 3=review
+  const [step, setStep] = useState(1);
   const [addrMode, setAddrMode] = useState(savedAddresses.length ? 'saved' : 'new');
   const [selectedAddr, setSelectedAddr] = useState(savedAddresses.find(a => a.isDefaultShipping) || savedAddresses[0] || null);
   const [newAddr, setNewAddr] = useState({ name: user?.name || '', phone: '', line1: '', line2: '', city: '', state: '', country: 'Nigeria', postal: '' });
-
-  const [payMode, setPayMode] = useState(savedCards.length ? 'saved' : 'new');
-  const [selectedCard, setSelectedCard] = useState(savedCards.find(c => c.isDefault) || savedCards[0] || null);
-  const [newCard, setNewCard] = useState({ name: '', number: '', exp: '', cvv: '' });
-  const [payType, setPayType] = useState('card'); // card | transfer | pay_on_delivery
+  const [payType, setPayType] = useState('card');
+  const [showStripeForm, setShowStripeForm] = useState(false);
+  const [resolvedAddress, setResolvedAddress] = useState('');
 
   const addrSummary = addrMode === 'saved' && selectedAddr
     ? `${selectedAddr.line1}, ${selectedAddr.city}, ${selectedAddr.state}`
@@ -43,21 +121,50 @@ function CheckoutModal({ cart, subtotal, shipping, discount, total, onClose, onC
 
   const paymentSummary = payType === 'transfer' ? 'Bank Transfer'
     : payType === 'pay_on_delivery' ? 'Pay on Delivery'
-    : payMode === 'saved' && selectedCard ? `${selectedCard.brand} •••• ${selectedCard.last4}`
-    : newCard.number ? `Card ending ${newCard.number.slice(-4)}` : 'Not provided';
+    : 'Credit / Debit Card (Stripe)';
 
-  const handleConfirm = () => {
-    const address = addrMode === 'saved' && selectedAddr
-      ? `${selectedAddr.name}, ${selectedAddr.line1}${selectedAddr.line2 ? ', ' + selectedAddr.line2 : ''}, ${selectedAddr.city}, ${selectedAddr.state}, ${selectedAddr.country}`
-      : `${newAddr.name}, ${newAddr.line1}${newAddr.line2 ? ', ' + newAddr.line2 : ''}, ${newAddr.city}, ${newAddr.state}, ${newAddr.country}`;
+  const getAddress = () => addrMode === 'saved' && selectedAddr
+    ? `${selectedAddr.name}, ${selectedAddr.line1}${selectedAddr.line2 ? ', ' + selectedAddr.line2 : ''}, ${selectedAddr.city}, ${selectedAddr.state}, ${selectedAddr.country}`
+    : `${newAddr.name}, ${newAddr.line1}${newAddr.line2 ? ', ' + newAddr.line2 : ''}, ${newAddr.city}, ${newAddr.state}, ${newAddr.country}`;
 
-    const payment = payType === 'transfer' ? 'Bank Transfer'
-      : payType === 'pay_on_delivery' ? 'Pay on Delivery'
-      : payMode === 'saved' && selectedCard ? `${selectedCard.brand} •••• ${selectedCard.last4}`
-      : `Card •••• ${newCard.number.slice(-4)}`;
-
-    onConfirm({ shippingAddress: address, paymentMethod: payment });
+  const handleReviewContinue = () => {
+    const addr = getAddress();
+    setResolvedAddress(addr);
+    if (payType === 'card') {
+      setShowStripeForm(true);
+    } else {
+      onConfirm({ shippingAddress: addr, paymentMethod: payType === 'transfer' ? 'Bank Transfer' : 'Pay on Delivery' });
+    }
   };
+
+  const handleStripeSuccess = (paymentMethod) => {
+    onConfirm({ shippingAddress: resolvedAddress, paymentMethod });
+  };
+
+  if (showStripeForm) {
+    return (
+      <div className="checkout-modal-overlay">
+        <div className="checkout-modal">
+          <button className="checkout-modal-close" onClick={onClose} aria-label="Close">
+            <i className="fas fa-times"></i>
+          </button>
+          <div style={{ padding: '1.5rem' }}>
+            <h3 style={{ marginBottom: '1rem' }}><i className="fas fa-credit-card"></i> Card Payment</h3>
+            <div style={{ marginBottom: '1rem', padding: '0.75rem', background: 'var(--bg-secondary)', borderRadius: '8px', fontSize: '0.9rem' }}>
+              <strong>Order total:</strong> {formatCurrency(total)}
+            </div>
+            <Elements stripe={stripePromise}>
+              <StripeCardForm
+                total={total}
+                onPaymentSuccess={handleStripeSuccess}
+                onCancel={() => setShowStripeForm(false)}
+              />
+            </Elements>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="checkout-modal-overlay" onClick={(e) => e.target === e.currentTarget && onClose()}>
@@ -66,7 +173,6 @@ function CheckoutModal({ cart, subtotal, shipping, discount, total, onClose, onC
           <i className="fas fa-times"></i>
         </button>
 
-        {/* Step indicators */}
         <div className="checkout-steps">
           {['Delivery', 'Payment', 'Review'].map((label, i) => (
             <div key={label} className={`checkout-step ${step === i + 1 ? 'active' : ''} ${step > i + 1 ? 'done' : ''}`}>
@@ -77,18 +183,16 @@ function CheckoutModal({ cart, subtotal, shipping, discount, total, onClose, onC
         </div>
 
         <div className="checkout-modal-body">
-          {/* STEP 1: Delivery Address */}
+          {/* STEP 1: Delivery */}
           {step === 1 && (
             <div className="checkout-section">
               <h3><i className="fas fa-map-marker-alt"></i> Delivery Address</h3>
-
               {savedAddresses.length > 0 && (
                 <div className="checkout-mode-tabs">
                   <button className={addrMode === 'saved' ? 'active' : ''} onClick={() => setAddrMode('saved')}>Saved Addresses</button>
                   <button className={addrMode === 'new' ? 'active' : ''} onClick={() => setAddrMode('new')}>New Address</button>
                 </div>
               )}
-
               {addrMode === 'saved' && savedAddresses.length > 0 ? (
                 <div className="checkout-addr-list">
                   {savedAddresses.map(a => (
@@ -106,52 +210,21 @@ function CheckoutModal({ cart, subtotal, shipping, discount, total, onClose, onC
                 </div>
               ) : (
                 <div className="checkout-form-grid">
-                  <div className="form-group">
-                    <label>Full Name *</label>
-                    <input className="form-control" value={newAddr.name} onChange={e => setNewAddr({...newAddr, name: e.target.value})} placeholder="John Doe" />
-                  </div>
-                  <div className="form-group">
-                    <label>Phone *</label>
-                    <input className="form-control" value={newAddr.phone} onChange={e => setNewAddr({...newAddr, phone: e.target.value})} placeholder="+234 800 000 0000" />
-                  </div>
-                  <div className="form-group full-width">
-                    <label>Address Line 1 *</label>
-                    <input className="form-control" value={newAddr.line1} onChange={e => setNewAddr({...newAddr, line1: e.target.value})} placeholder="Street address" />
-                  </div>
-                  <div className="form-group full-width">
-                    <label>Address Line 2</label>
-                    <input className="form-control" value={newAddr.line2} onChange={e => setNewAddr({...newAddr, line2: e.target.value})} placeholder="Apartment, suite, etc." />
-                  </div>
-                  <div className="form-group">
-                    <label>City *</label>
-                    <input className="form-control" value={newAddr.city} onChange={e => setNewAddr({...newAddr, city: e.target.value})} placeholder="Lagos" />
-                  </div>
-                  <div className="form-group">
-                    <label>State *</label>
-                    <input className="form-control" value={newAddr.state} onChange={e => setNewAddr({...newAddr, state: e.target.value})} placeholder="Lagos State" />
-                  </div>
-                  <div className="form-group">
-                    <label>Country *</label>
-                    <input className="form-control" value={newAddr.country} onChange={e => setNewAddr({...newAddr, country: e.target.value})} />
-                  </div>
-                  <div className="form-group">
-                    <label>Postal Code</label>
-                    <input className="form-control" value={newAddr.postal} onChange={e => setNewAddr({...newAddr, postal: e.target.value})} placeholder="100001" />
-                  </div>
+                  <div className="form-group"><label>Full Name *</label><input className="form-control" value={newAddr.name} onChange={e => setNewAddr({...newAddr, name: e.target.value})} placeholder="John Doe" /></div>
+                  <div className="form-group"><label>Phone *</label><input className="form-control" value={newAddr.phone} onChange={e => setNewAddr({...newAddr, phone: e.target.value})} placeholder="+234 800 000 0000" /></div>
+                  <div className="form-group full-width"><label>Address Line 1 *</label><input className="form-control" value={newAddr.line1} onChange={e => setNewAddr({...newAddr, line1: e.target.value})} placeholder="Street address" /></div>
+                  <div className="form-group full-width"><label>Address Line 2</label><input className="form-control" value={newAddr.line2} onChange={e => setNewAddr({...newAddr, line2: e.target.value})} placeholder="Apartment, suite, etc." /></div>
+                  <div className="form-group"><label>City *</label><input className="form-control" value={newAddr.city} onChange={e => setNewAddr({...newAddr, city: e.target.value})} placeholder="Lagos" /></div>
+                  <div className="form-group"><label>State *</label><input className="form-control" value={newAddr.state} onChange={e => setNewAddr({...newAddr, state: e.target.value})} placeholder="Lagos State" /></div>
+                  <div className="form-group"><label>Country *</label><input className="form-control" value={newAddr.country} onChange={e => setNewAddr({...newAddr, country: e.target.value})} /></div>
+                  <div className="form-group"><label>Postal Code</label><input className="form-control" value={newAddr.postal} onChange={e => setNewAddr({...newAddr, postal: e.target.value})} placeholder="100001" /></div>
                 </div>
               )}
-
               <div className="checkout-nav-btns">
                 <button className="btn-outline" onClick={onClose}>Cancel</button>
                 <button className="btn-primary" onClick={() => {
-                  if (addrMode === 'new' && (!newAddr.name || !newAddr.line1 || !newAddr.city || !newAddr.state)) {
-                    showNotification('Please fill all required address fields', 'error');
-                    return;
-                  }
-                  if (addrMode === 'saved' && !selectedAddr) {
-                    showNotification('Please select a delivery address', 'error');
-                    return;
-                  }
+                  if (addrMode === 'new' && (!newAddr.name || !newAddr.line1 || !newAddr.city || !newAddr.state)) { showNotification('Please fill all required address fields', 'error'); return; }
+                  if (addrMode === 'saved' && !selectedAddr) { showNotification('Please select a delivery address', 'error'); return; }
                   setStep(2);
                 }}>Continue to Payment <i className="fas fa-arrow-right"></i></button>
               </div>
@@ -162,7 +235,6 @@ function CheckoutModal({ cart, subtotal, shipping, discount, total, onClose, onC
           {step === 2 && (
             <div className="checkout-section">
               <h3><i className="fas fa-credit-card"></i> Payment Method</h3>
-
               <div className="checkout-pay-types">
                 {[
                   { id: 'card', label: 'Credit / Debit Card', icon: 'fas fa-credit-card' },
@@ -178,49 +250,13 @@ function CheckoutModal({ cart, subtotal, shipping, discount, total, onClose, onC
               </div>
 
               {payType === 'card' && (
-                <>
-                  {savedCards.length > 0 && (
-                    <div className="checkout-mode-tabs">
-                      <button className={payMode === 'saved' ? 'active' : ''} onClick={() => setPayMode('saved')}>Saved Cards</button>
-                      <button className={payMode === 'new' ? 'active' : ''} onClick={() => setPayMode('new')}>New Card</button>
-                    </div>
-                  )}
-
-                  {payMode === 'saved' && savedCards.length > 0 ? (
-                    <div className="checkout-addr-list">
-                      {savedCards.map(c => (
-                        <label key={c.id} className={`checkout-addr-card ${selectedCard?.id === c.id ? 'selected' : ''}`}>
-                          <input type="radio" name="card" checked={selectedCard?.id === c.id} onChange={() => setSelectedCard(c)} />
-                          <div>
-                            <strong>{c.brand} •••• {c.last4}</strong>
-                            {c.isDefault && <span className="addr-badge">Default</span>}
-                            <p>Expires {c.expMonth}/{c.expYear} &nbsp;·&nbsp; {c.name}</p>
-                          </div>
-                          <i className="fab fa-cc-visa" style={{ fontSize: '1.6rem', color: '#1a1f71', marginLeft: 'auto' }}></i>
-                        </label>
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="checkout-form-grid">
-                      <div className="form-group full-width">
-                        <label>Name on Card *</label>
-                        <input className="form-control" value={newCard.name} onChange={e => setNewCard({...newCard, name: e.target.value})} placeholder="John Doe" />
-                      </div>
-                      <div className="form-group full-width">
-                        <label>Card Number *</label>
-                        <input className="form-control" value={newCard.number} onChange={e => setNewCard({...newCard, number: e.target.value.replace(/\D/g,'').slice(0,16)})} placeholder="1234 5678 9012 3456" maxLength={16} />
-                      </div>
-                      <div className="form-group">
-                        <label>Expiry (MM/YY) *</label>
-                        <input className="form-control" value={newCard.exp} onChange={e => setNewCard({...newCard, exp: e.target.value})} placeholder="12/27" maxLength={5} />
-                      </div>
-                      <div className="form-group">
-                        <label>CVV *</label>
-                        <input className="form-control" value={newCard.cvv} onChange={e => setNewCard({...newCard, cvv: e.target.value.replace(/\D/g,'').slice(0,4)})} placeholder="123" maxLength={4} type="password" />
-                      </div>
-                    </div>
-                  )}
-                </>
+                <div className="checkout-info-box">
+                  <i className="fab fa-stripe" style={{ fontSize: '1.4rem', color: '#635bff' }}></i>
+                  <div>
+                    <strong>Secure Card Payment via Stripe</strong>
+                    <p>Your card details are encrypted and processed securely by Stripe. We never store your card information.</p>
+                  </div>
+                </div>
               )}
 
               {payType === 'transfer' && (
@@ -248,22 +284,15 @@ function CheckoutModal({ cart, subtotal, shipping, discount, total, onClose, onC
 
               <div className="checkout-nav-btns">
                 <button className="btn-outline" onClick={() => setStep(1)}><i className="fas fa-arrow-left"></i> Back</button>
-                <button className="btn-primary" onClick={() => {
-                  if (payType === 'card') {
-                    if (payMode === 'saved' && !selectedCard) { showNotification('Please select a card', 'error'); return; }
-                    if (payMode === 'new' && (!newCard.name || !newCard.number || !newCard.exp || !newCard.cvv)) { showNotification('Please fill all card fields', 'error'); return; }
-                  }
-                  setStep(3);
-                }}>Review Order <i className="fas fa-arrow-right"></i></button>
+                <button className="btn-primary" onClick={() => setStep(3)}>Review Order <i className="fas fa-arrow-right"></i></button>
               </div>
             </div>
           )}
 
-          {/* STEP 3: Review & Confirm */}
+          {/* STEP 3: Review */}
           {step === 3 && (
             <div className="checkout-section">
               <h3><i className="fas fa-clipboard-check"></i> Order Review</h3>
-
               <div className="checkout-review-grid">
                 <div className="checkout-review-block">
                   <h4><i className="fas fa-map-marker-alt"></i> Delivery Address</h4>
@@ -276,32 +305,26 @@ function CheckoutModal({ cart, subtotal, shipping, discount, total, onClose, onC
                   <button className="checkout-edit-btn" onClick={() => setStep(2)}>Edit</button>
                 </div>
               </div>
-
               <div className="checkout-items-list">
                 <h4>Items ({cart.length})</h4>
                 {cart.map(item => (
                   <div className="checkout-item-row" key={item.id}>
                     <img src={item.image} alt={item.name} />
-                    <div>
-                      <strong>{item.name}</strong>
-                      <span>Qty: {item.quantity}</span>
-                    </div>
+                    <div><strong>{item.name}</strong><span>Qty: {item.quantity}</span></div>
                     <strong>{formatCurrency(item.price * item.quantity)}</strong>
                   </div>
                 ))}
               </div>
-
               <div className="checkout-totals">
                 <div className="checkout-total-row"><span>Subtotal</span><span>{formatCurrency(subtotal)}</span></div>
                 <div className="checkout-total-row"><span>Shipping</span><span>{shipping === 0 ? 'Free' : formatCurrency(shipping)}</span></div>
                 {discount > 0 && <div className="checkout-total-row discount"><span>Discount</span><span>-{formatCurrency(discount)}</span></div>}
                 <div className="checkout-total-row total"><span>Total</span><span>{formatCurrency(total)}</span></div>
               </div>
-
               <div className="checkout-nav-btns">
                 <button className="btn-outline" onClick={() => setStep(2)}><i className="fas fa-arrow-left"></i> Back</button>
-                <button className="btn-primary place-order-btn" onClick={handleConfirm}>
-                  <i className="fas fa-lock"></i> Place Order · {formatCurrency(total)}
+                <button className="btn-primary place-order-btn" onClick={handleReviewContinue}>
+                  <i className="fas fa-lock"></i> {payType === 'card' ? 'Continue to Payment' : `Place Order · ${formatCurrency(total)}`}
                 </button>
               </div>
             </div>
@@ -322,9 +345,7 @@ function OrderSuccessModal({ order, onClose }) {
         <p className="success-sub">You'll receive a confirmation shortly. Track your order in <strong>My Orders</strong>.</p>
         <div className="success-actions">
           <button className="btn-outline" onClick={onClose}><i className="fas fa-home"></i> Continue Shopping</button>
-          <Link to="/account-settings/orders" className="btn-primary" onClick={onClose}>
-            <i className="fas fa-box"></i> View My Orders
-          </Link>
+          <Link to="/account-settings/orders" className="btn-primary" onClick={onClose}><i className="fas fa-box"></i> View My Orders</Link>
         </div>
       </div>
     </div>
@@ -332,7 +353,6 @@ function OrderSuccessModal({ order, onClose }) {
 }
 
 export default function CartPage() {
-
   usePageMeta({ title: 'Shopping Cart', description: 'Review your cart and proceed to checkout on LUXORA.' });
   const [cart, setCart] = useState(() => (getCart() || []).filter((item) => typeof item.price === 'number' && !Number.isNaN(item.price)));
   const [promoInput, setPromoInput] = useState('');
@@ -453,7 +473,6 @@ export default function CartPage() {
     const user = getCurrentUser();
     if (!user) return;
 
-    // Send order to backend if user has a token
     if (getToken()) {
       try {
         const items = cart.map((item) => ({
@@ -463,12 +482,9 @@ export default function CartPage() {
           quantity: item.quantity,
         }));
         await apiCreateOrder(items);
-      } catch (_) {
-        // Backend unavailable — continue with localStorage only
-      }
+      } catch (_) {}
     }
 
-    // Always save to localStorage (keeps existing order history working)
     const order = createOrder({
       userId: user.id,
       userEmail: user.email,
@@ -525,12 +541,8 @@ export default function CartPage() {
         <div className="cart-header">
           <h1><i className="fas fa-shopping-bag"></i> Shopping Cart</h1>
           <div className="cart-actions">
-            <button id="clear-cart" className="btn-secondary" onClick={handleClear}>
-              <i className="fas fa-trash"></i> Clear Cart
-            </button>
-            <Link to="/" className="btn-outline">
-              <i className="fas fa-arrow-left"></i> Continue Shopping
-            </Link>
+            <button id="clear-cart" className="btn-secondary" onClick={handleClear}><i className="fas fa-trash"></i> Clear Cart</button>
+            <Link to="/" className="btn-outline"><i className="fas fa-arrow-left"></i> Continue Shopping</Link>
           </div>
         </div>
 
@@ -550,9 +562,7 @@ export default function CartPage() {
                 const pDiscount = item.originalPrice ? Math.round(100 - (item.price / item.originalPrice) * 100) : 0;
                 return (
                   <div className={`cart-item ${updatedItemId === item.id ? 'updated' : ''}`} key={item.id} data-id={item.id}>
-                    <div className="cart-item-image">
-                      <img src={item.image} alt={item.name} loading="lazy" />
-                    </div>
+                    <div className="cart-item-image"><img src={item.image} alt={item.name} loading="lazy" /></div>
                     <div className="cart-item-details">
                       <h3><Link to={`/product?id=${item.id}`}>{item.name}</Link></h3>
                       <div className="cart-item-meta">
@@ -569,19 +579,12 @@ export default function CartPage() {
                     </div>
                     <div className="cart-item-actions">
                       <div className="quantity-controls">
-                        <button className="quantity-btn decrease-btn" disabled={item.quantity <= 1} onClick={() => handleQty(item.id, item.quantity - 1)}>
-                          <i className="fas fa-minus"></i>
-                        </button>
-                        <input type="number" className="quantity-input" value={item.quantity} min="1" max={item.stock}
-                          onChange={(e) => handleQty(item.id, e.target.value)} />
-                        <button className="quantity-btn increase-btn" disabled={item.quantity >= (item.stock || 1)} onClick={() => handleQty(item.id, item.quantity + 1)}>
-                          <i className="fas fa-plus"></i>
-                        </button>
+                        <button className="quantity-btn decrease-btn" disabled={item.quantity <= 1} onClick={() => handleQty(item.id, item.quantity - 1)}><i className="fas fa-minus"></i></button>
+                        <input type="number" className="quantity-input" value={item.quantity} min="1" max={item.stock} onChange={(e) => handleQty(item.id, e.target.value)} />
+                        <button className="quantity-btn increase-btn" disabled={item.quantity >= (item.stock || 1)} onClick={() => handleQty(item.id, item.quantity + 1)}><i className="fas fa-plus"></i></button>
                       </div>
                       <div className="item-total">{formatCurrency(item.price * item.quantity)}</div>
-                      <button className="remove-item" onClick={() => handleRemove(item.id)}>
-                        <i className="fas fa-trash"></i> Remove
-                      </button>
+                      <button className="remove-item" onClick={() => handleRemove(item.id)}><i className="fas fa-trash"></i> Remove</button>
                     </div>
                   </div>
                 );
@@ -591,42 +594,23 @@ export default function CartPage() {
             <div className="cart-summary">
               <div className="summary-card">
                 <h3>Order Summary</h3>
-                <div className="summary-row">
-                  <span>Subtotal ({getCartItemCount()} items)</span>
-                  <span>{formatCurrency(subtotal)}</span>
-                </div>
-                <div className="summary-row">
-                  <span>Shipping</span>
-                  <span>{shipping === 0 ? <span style={{color:'var(--success-color)'}}>Free</span> : formatCurrency(shipping)}</span>
-                </div>
-                {discount > 0 && (
-                  <div className="summary-row discount-row">
-                    <span>Discount</span>
-                    <span style={{color:'var(--success-color)'}}>-{formatCurrency(discount)}</span>
-                  </div>
-                )}
+                <div className="summary-row"><span>Subtotal ({getCartItemCount()} items)</span><span>{formatCurrency(subtotal)}</span></div>
+                <div className="summary-row"><span>Shipping</span><span>{shipping === 0 ? <span style={{color:'var(--success-color)'}}>Free</span> : formatCurrency(shipping)}</span></div>
+                {discount > 0 && (<div className="summary-row discount-row"><span>Discount</span><span style={{color:'var(--success-color)'}}>-{formatCurrency(discount)}</span></div>)}
                 <div className="summary-divider"></div>
-                <div className="summary-row total-row">
-                  <span>Total</span>
-                  <span>{formatCurrency(total)}</span>
-                </div>
+                <div className="summary-row total-row"><span>Total</span><span>{formatCurrency(total)}</span></div>
 
                 <div className="promo-code">
                   <h4>Promo Code</h4>
                   {appliedPromo ? (
                     <div className="promo-applied">
-                      <div className="promo-success">
-                        <i className="fas fa-tag"></i> {appliedPromo.code} — {appliedPromo.description}
-                      </div>
-                      <button className="promo-remove-btn" onClick={removePromo} aria-label="Remove promo">
-                        <i className="fas fa-times"></i>
-                      </button>
+                      <div className="promo-success"><i className="fas fa-tag"></i> {appliedPromo.code} — {appliedPromo.description}</div>
+                      <button className="promo-remove-btn" onClick={removePromo} aria-label="Remove promo"><i className="fas fa-times"></i></button>
                     </div>
                   ) : (
                     <form id="promo-form" onSubmit={applyPromo}>
                       <div className="promo-input">
-                        <input type="text" id="promo-code" placeholder="Enter promo code (e.g. WELCOME10)"
-                          value={promoInput} onChange={(e) => setPromoInput(e.target.value)} />
+                        <input type="text" id="promo-code" placeholder="Enter promo code (e.g. WELCOME10)" value={promoInput} onChange={(e) => setPromoInput(e.target.value)} />
                         <button type="submit">Apply</button>
                       </div>
                       <div className="promo-hint">Try: WELCOME10 · SAVE5000 · FREESHIP</div>
@@ -643,7 +627,7 @@ export default function CartPage() {
                   <div className="payment-icons">
                     <i className="fab fa-cc-visa"></i>
                     <i className="fab fa-cc-mastercard"></i>
-                    <i className="fab fa-cc-paypal"></i>
+                    <i className="fab fa-stripe"></i>
                     <i className="fas fa-university"></i>
                   </div>
                 </div>
@@ -658,9 +642,7 @@ export default function CartPage() {
             <div className="product-grid" id="recently-viewed-grid">
               {recentlyViewed.map((p) => (
                 <div className="product-card" key={p.id}>
-                  <div className="product-image">
-                    <Link to={`/product?id=${p.id}`}><img src={p.image} alt={p.name} loading="lazy" /></Link>
-                  </div>
+                  <div className="product-image"><Link to={`/product?id=${p.id}`}><img src={p.image} alt={p.name} loading="lazy" /></Link></div>
                   <div className="product-info">
                     <h3><Link to={`/product?id=${p.id}`}>{p.name}</Link></h3>
                     <div className="price">{formatCurrency(p.price)}</div>
@@ -702,11 +684,7 @@ export default function CartPage() {
 
       {showCheckout && (
         <CheckoutModal
-          cart={cart}
-          subtotal={subtotal}
-          shipping={shipping}
-          discount={discount}
-          total={total}
+          cart={cart} subtotal={subtotal} shipping={shipping} discount={discount} total={total}
           onClose={() => setShowCheckout(false)}
           onConfirm={handleConfirmOrder}
         />
