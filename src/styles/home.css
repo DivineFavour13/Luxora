@@ -586,9 +586,15 @@
   cursor: pointer;
 }
 
-.lookbook-strip-wishlist.active {
+.lookbook-strip-wishlist:hover {
   background: var(--primary-color);
   color: #fff;
+  transform: scale(1.1);
+}
+
+.lookbook-strip-wishlist.active {
+  background: var(--primary-color) !important;
+  color: #fff !important;
 }
 
 .lookbook-strip-image {

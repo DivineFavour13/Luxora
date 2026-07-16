@@ -117,14 +117,14 @@
 }
 
 .wishlist-btn:hover {
-  background: var(--primary-color);
-  color: var(--text-white);
+  background: var(--primary-color) !important;
+  color: #fff !important;
   transform: scale(1.1);
 }
 
 .wishlist-btn.active {
-  background: var(--primary-color);
-  color: var(--text-white);
+  background: var(--primary-color) !important;
+  color: #fff !important;
 }
 
 .thumbnail-images {

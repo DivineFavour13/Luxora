@@ -8,10 +8,15 @@ export function ensureNotificationContainer() {
   }
 }
 
-export function showNotification(message, type = 'info', duration = 5000) {
+export function showNotification(message, type = 'info', duration = 2500) {
   ensureNotificationContainer();
   const container = document.getElementById('notification-container');
   if (!container) return;
+
+  // Remove all existing notifications instantly
+  Array.from(container.children).forEach(n => {
+    if (n.parentNode) n.parentNode.removeChild(n);
+  });
 
   const notification = document.createElement('div');
   notification.className = `notification notification-${type}`;
@@ -27,13 +32,12 @@ export function showNotification(message, type = 'info', duration = 5000) {
   notification.innerHTML = `
     <div class="notification-content">
       <i class="${icon}"></i>
-      <span>${message}</span>
+      <span class="notification-message">${message}</span>
     </div>
     <button class="notification-close">&times;</button>
   `;
 
   container.appendChild(notification);
-  setTimeout(() => notification.classList.add('show'), 50);
 
   const autoRemove = setTimeout(() => removeNotification(notification), duration);
   const closeBtn = notification.querySelector('.notification-close');
@@ -46,7 +50,7 @@ export function showNotification(message, type = 'info', duration = 5000) {
 }
 
 function removeNotification(notification) {
-  notification.classList.add('hide');
+  notification.classList.add('slide-out');
   setTimeout(() => {
     if (notification.parentNode) {
       notification.parentNode.removeChild(notification);
