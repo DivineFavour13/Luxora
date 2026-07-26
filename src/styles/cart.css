@@ -136,7 +136,7 @@
 
 .quantity-btn {
   background: var(--primary-color);
-  color: var(--text-white);
+  color: white !important;
   border: none;
   border-radius: 6px;
   width: 32px;
@@ -286,7 +286,7 @@
 
 .promo-input button {
   background: var(--primary-color);
-  color: var(--text-white);
+  color: white !important;
   border: none;
   border-radius: 8px;
   padding: 0.75rem 1rem;
@@ -356,12 +356,16 @@
 
 .payment-icons i {
   font-size: 1.8rem;
-  color: var(--text-muted);
   transition: color 0.3s ease;
 }
 
+.payment-icons .fa-cc-visa { color: #1a1f71; }
+.payment-icons .fa-cc-mastercard { color: #eb001b; }
+.payment-icons .fa-stripe { color: #635bff; }
+.payment-icons .fa-university { color: #4a90a4; }
+
 .payment-icons i:hover {
-  color: var(--primary-color);
+  opacity: 0.75;
 }
 
 /* Empty Cart Styles */
@@ -1081,5 +1085,152 @@
   justify-content: center;
   margin-top: 1.75rem;
   flex-wrap: wrap;
+}
+
+/* ── Recommended & Recently Viewed sections ── */
+.recommended-products,
+.recently-viewed {
+  margin-top: 3rem;
+  padding-top: 2rem;
+  border-top: 1px solid var(--border-color);
+}
+
+.recommended-products h2,
+.recently-viewed h2 {
+  font-size: 1.4rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin-bottom: 1.5rem;
+}
+
+.recommended-products .product-grid,
+.recently-viewed .product-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 1.25rem;
+}
+
+.recommended-products .product-card,
+.recently-viewed .product-card {
+  background: var(--bg-primary);
+  border-radius: 12px;
+  border: 1px solid var(--border-color);
+  overflow: hidden;
+  transition: box-shadow 0.2s, transform 0.2s;
+}
+
+.recommended-products .product-card:hover,
+.recently-viewed .product-card:hover {
+  box-shadow: var(--shadow-md);
+  transform: translateY(-3px);
+}
+
+.recommended-products .product-image,
+.recently-viewed .product-image {
+  width: 100%;
+  aspect-ratio: 1;
+  overflow: hidden;
+  background: var(--bg-secondary);
+  position: relative;
+}
+
+.recommended-products .product-image img,
+.recently-viewed .product-image img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform 0.3s ease;
+}
+
+.recommended-products .product-card:hover .product-image img,
+.recently-viewed .product-card:hover .product-image img {
+  transform: scale(1.05);
+}
+
+.recommended-products .discount-badge {
+  position: absolute;
+  top: 0.6rem;
+  left: 0.6rem;
+  background: var(--accent-color);
+  color: var(--primary-color);
+  font-size: 0.72rem;
+  font-weight: 700;
+  padding: 0.2rem 0.5rem;
+  border-radius: 4px;
+}
+
+.recommended-products .product-info,
+.recently-viewed .product-info {
+  padding: 0.85rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.recommended-products .product-info h3,
+.recently-viewed .product-info h3 {
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  line-height: 1.3;
+  margin: 0;
+}
+
+.recommended-products .product-info h3 a,
+.recently-viewed .product-info h3 a {
+  color: inherit;
+  text-decoration: none;
+}
+
+.recommended-products .price,
+.recently-viewed .price {
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.recommended-products .old-price {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  text-decoration: line-through;
+  font-weight: 400;
+}
+
+.recommended-products .add-to-cart,
+.recently-viewed .add-to-cart {
+  margin-top: 0.4rem;
+  width: 100%;
+  padding: 0.6rem;
+  background: var(--primary-color);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: opacity 0.2s;
+}
+
+.recommended-products .add-to-cart:hover,
+.recently-viewed .add-to-cart:hover {
+  opacity: 0.85;
+  transform: none;
+}
+
+@media (max-width: 1024px) {
+  .recommended-products .product-grid,
+  .recently-viewed .product-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+@media (max-width: 768px) {
+  .recommended-products .product-grid,
+  .recently-viewed .product-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
 }
 
