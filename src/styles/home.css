@@ -741,3 +741,127 @@
     height: 220px;
   }
 }
+
+@media (max-width: 768px) {
+  .lookbook-strip-scroller {
+    display: flex !important;
+    flex-direction: row !important;
+    overflow-x: auto !important;
+    overflow-y: hidden !important;
+    gap: 0.75rem !important;
+    padding-bottom: 1rem !important;
+    scroll-snap-type: x mandatory !important;
+    -webkit-overflow-scrolling: touch !important;
+    scrollbar-width: none !important;
+  }
+
+  .lookbook-strip-scroller::-webkit-scrollbar {
+    display: none !important;
+  }
+
+  .lookbook-strip-item {
+    flex: 0 0 38% !important;
+    min-width: 38% !important;
+    max-width: 38% !important;
+    scroll-snap-align: start !important;
+  }
+
+  .lookbook-strip-cta {
+    font-size: 0.75rem !important;
+    padding: 0.5rem 0.4rem !important;
+    white-space: nowrap !important;
+  }
+
+  .lookbook-strip-copy {
+    font-size: 0.78rem !important;
+  }
+}
+
+@media (max-width: 768px) {
+
+  /* Fix strip item sizing - show ~2.5 cards */
+  .lookbook-strip-item {
+    flex: 0 0 42% !important;
+    min-width: 42% !important;
+    max-width: 42% !important;
+  }
+
+  /* Fix card image height */
+  .lookbook-strip-image {
+    height: 160px !important;
+  }
+
+  .lookbook-strip-image img {
+    width: 100% !important;
+    height: 100% !important;
+    object-fit: cover !important;
+  }
+
+  /* Fix text overflow in cards */
+  .lookbook-strip-copy {
+    padding: 0.4rem 0.5rem !important;
+  }
+
+  .lookbook-strip-copy h3,
+  .lookbook-strip-copy .lookbook-strip-name {
+    font-size: 0.78rem !important;
+    line-height: 1.2 !important;
+    overflow: hidden !important;
+    display: -webkit-box !important;
+    -webkit-line-clamp: 2 !important;
+    -webkit-box-orient: vertical !important;
+  }
+
+  .lookbook-strip-copy .lookbook-strip-brand,
+  .lookbook-strip-copy .lookbook-strip-category {
+    font-size: 0.68rem !important;
+  }
+
+  .lookbook-strip-copy .lookbook-strip-price {
+    font-size: 0.8rem !important;
+  }
+
+  .lookbook-strip-cta {
+    font-size: 0.72rem !important;
+    padding: 0.45rem 0.5rem !important;
+    white-space: nowrap !important;
+    width: 100% !important;
+  }
+
+  /* Most Wanted Pieces / Trending grid - horizontal scroll */
+  .lookbook-trending-grid {
+    display: flex !important;
+    flex-direction: row !important;
+    overflow-x: auto !important;
+    overflow-y: hidden !important;
+    gap: 0.75rem !important;
+    padding-bottom: 1rem !important;
+    scroll-snap-type: x mandatory !important;
+    -webkit-overflow-scrolling: touch !important;
+    scrollbar-width: none !important;
+  }
+
+  .lookbook-trending-grid::-webkit-scrollbar {
+    display: none !important;
+  }
+
+  .lookbook-trending-item {
+    flex: 0 0 42% !important;
+    min-width: 42% !important;
+    max-width: 42% !important;
+    scroll-snap-align: start !important;
+  }
+
+  /* Social proof stats - horizontal row */
+  .lookbook-proof-stats {
+    display: flex !important;
+    flex-direction: row !important;
+    gap: 0.5rem !important;
+    overflow-x: auto !important;
+  }
+
+  .lookbook-proof-stat {
+    flex: 0 0 auto !important;
+    min-width: 100px !important;
+  }
+}
