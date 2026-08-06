@@ -815,8 +815,80 @@
   .apf-grid { grid-template-columns: 1fr; }
   .apf-full { grid-column: 1; }
   .admin-health-grid { grid-template-columns: repeat(2, 1fr); }
-  .admin-filters { flex-wrap: wrap; }
-  .admin-select { max-width: 100%; width: 100%; }
+  .admin-filters { flex-wrap: wrap; gap: 0.6rem; }
+  .admin-search-wrap { flex: 1 1 100%; }
+  .admin-select { max-width: none; width: auto; flex: 1 1 140px; }
+
+  /* ── Tables → stacked cards ── */
+  .admin-table-wrap { overflow-x: visible; }
+
+  .admin-table thead { display: none; }
+
+  .admin-table, .admin-table tbody, .admin-table tr, .admin-table td {
+    display: block;
+    width: 100%;
+  }
+
+  .admin-table {
+    border: none;
+  }
+
+  .admin-table tbody tr {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 10px;
+    margin-bottom: 0.75rem;
+    padding: 0.4rem 0.9rem;
+  }
+
+  .admin-table tbody tr:hover td { background: transparent; }
+
+  .admin-table td {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    padding: 0.55rem 0;
+    border-bottom: 1px solid var(--border-color);
+    text-align: right;
+  }
+
+  .admin-table td:last-child { border-bottom: none; }
+
+  .admin-table td::before {
+    content: attr(data-label);
+    font-size: 0.72rem;
+    font-weight: 600;
+    color: var(--text-muted);
+    text-align: left;
+    flex-shrink: 0;
+  }
+
+  /* Empty-state row (colSpan) shouldn't behave like a labeled field */
+  .admin-table td.admin-table-empty {
+    justify-content: center;
+    text-align: center;
+    border-bottom: none;
+    padding: 1.25rem 0;
+  }
+
+  .admin-table td.admin-table-empty::before { content: none; }
+
+  /* Cells whose content is a full-width control (status dropdown) */
+  .admin-table td:has(select.admin-status-select) {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .admin-table td:has(select.admin-status-select)::before {
+    margin-bottom: 0.3rem;
+  }
+
+  .admin-status-select { width: 100%; }
+
+  .admin-row-actions { justify-content: flex-end; }
+
+  .admin-order-stats-row { flex-wrap: wrap; gap: 0.4rem; }
 }
 
 @media (max-width: 480px) {

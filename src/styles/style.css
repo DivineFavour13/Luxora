@@ -610,6 +610,21 @@ header.minimized .search-bar button {
   border-radius: 6px;
 }
 
+.mobile-search-btn {
+  display: none;
+  background: none;
+  border: none;
+  color: var(--text-primary);
+  font-size: 1.15rem;
+  padding: 0.4rem;
+  cursor: pointer;
+  border-radius: 6px;
+}
+
+.mobile-search-btn:hover {
+  background: var(--bg-tertiary);
+}
+
 .mobile-menu-btn:hover {
   background: var(--bg-tertiary);
   transform: none;
@@ -1001,6 +1016,60 @@ footer {
 
   .search-bar {
     display: none;
+  }
+
+  .mobile-search-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .mobile-search-row {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.6rem 1rem;
+    background: var(--bg-primary);
+    border-top: 1px solid var(--border-color);
+    border-bottom: 1px solid var(--border-color);
+    position: relative;
+  }
+
+  .mobile-search-row .search-icon-prefix {
+    position: static;
+    transform: none;
+    color: var(--text-muted);
+    font-size: 0.9rem;
+    flex-shrink: 0;
+  }
+
+  .mobile-search-row input {
+    flex: 1;
+    border: 2px solid var(--border-color);
+    border-radius: 25px;
+    padding: 0.6rem 1rem;
+    font-size: 0.9rem;
+    background: var(--bg-primary);
+    color: var(--text-primary);
+  }
+
+  .mobile-search-row input:focus {
+    outline: none;
+    border-color: var(--primary-color);
+  }
+
+  .mobile-search-row button {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--primary-color);
+    color: white;
+    border: none;
+    border-radius: 50%;
+    width: 34px;
+    height: 34px;
+    flex-shrink: 0;
+    cursor: pointer;
   }
 
   .logo h2 {

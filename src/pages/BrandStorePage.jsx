@@ -52,6 +52,7 @@ export default function BrandStorePage() {
   const [selectedAudience, setSelectedAudience] = useState('all');
   const [selectedSport, setSelectedSport] = useState('all');
   const [, setWishlistVersion] = useState(0);
+  const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
 
   const catalogProducts = useMemo(() => getProducts() || [], []);
   const brandName = useMemo(() => findBrandBySlug(catalogProducts, brandSlug), [catalogProducts, brandSlug]);
@@ -278,7 +279,15 @@ export default function BrandStorePage() {
 
         <section className="brand-content">
           <aside className="brand-sidebar">
-            <div className="brand-filter-panel">
+            <button
+              type="button"
+              className="brand-filter-toggle"
+              onClick={() => setMobileFiltersOpen(v => !v)}
+            >
+              <span><i className="fas fa-sliders-h"></i> Filters</span>
+              <i className={`fas fa-chevron-${mobileFiltersOpen ? 'up' : 'down'}`}></i>
+            </button>
+            <div className={`brand-filter-panel ${mobileFiltersOpen ? 'is-open' : ''}`}>
               <section className="brand-filter-section">
                 <h3>Categories</h3>
                 <button className={`brand-link ${selectedCategory === 'all' ? 'active' : ''}`} onClick={() => setSelectedCategory('all')}>
@@ -396,21 +405,23 @@ export default function BrandStorePage() {
                 onChange={(event) => setSearchText(event.target.value)}
                 placeholder={`Search inside ${brandName} store...`}
               />
-              <label>
-                <input
-                  type="checkbox"
-                  checked={discountOnly}
-                  onChange={(event) => setDiscountOnly(event.target.checked)}
-                />
-                Deals only
-              </label>
-              <select value={sortBy} onChange={(event) => setSortBy(event.target.value)}>
-                <option value="featured">Featured</option>
-                <option value="latest">Latest</option>
-                <option value="rating">Top Rated</option>
-                <option value="price-asc">Price: Low to High</option>
-                <option value="price-desc">Price: High to Low</option>
-              </select>
+              <div className="brand-toolbar-row2">
+                <label>
+                  <input
+                    type="checkbox"
+                    checked={discountOnly}
+                    onChange={(event) => setDiscountOnly(event.target.checked)}
+                  />
+                  Deals only
+                </label>
+                <select value={sortBy} onChange={(event) => setSortBy(event.target.value)}>
+                  <option value="featured">Featured</option>
+                  <option value="latest">Latest</option>
+                  <option value="rating">Top Rated</option>
+                  <option value="price-asc">Price: Low to High</option>
+                  <option value="price-desc">Price: High to Low</option>
+                </select>
+              </div>
             </div>
 
             <div className="brand-products-grid">

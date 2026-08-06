@@ -493,13 +493,13 @@ export default function AdminPage() {
                         const stockNum = Number(p.stock || 0);
                         return (
                           <tr key={p.id}>
-                            <td><div className="admin-product-cell"><img src={p.image} alt={p.name} className="admin-product-thumb" /><div><strong>{p.name}</strong><span>{p.brand}</span></div></div></td>
-                            <td><span className="admin-cat-pill">{p.category}</span></td>
-                            <td><div className="admin-price-cell"><strong>{formatCurrency(p.price || 0)}</strong>{p.originalPrice && <s>{formatCurrency(p.originalPrice)}</s>}</div></td>
-                            <td><span className={`admin-stock-badge ${stockNum <= 0 ? 'empty' : stockNum < 10 ? 'low' : stockNum < 30 ? 'medium' : 'good'}`}>{stockNum}</span></td>
-                            <td><div className="admin-tag-pills">{p.isFlashSale && <span className="admin-tag flash"><i className="fas fa-bolt"></i></span>}{p.isTopSeller && <span className="admin-tag top"><i className="fas fa-fire"></i></span>}{p.isNewArrival && <span className="admin-tag new"><i className="fas fa-star"></i></span>}</div></td>
-                            <td><span className={`admin-prod-status ${st}`}>{st === 'active' ? 'Active' : st === 'inactive' ? 'Inactive' : 'Out of Stock'}</span></td>
-                            <td><div className="admin-row-actions"><button className="admin-action-btn edit" onClick={() => startEdit(p)} title="Edit"><i className="fas fa-edit"></i></button><button className="admin-action-btn delete" onClick={() => handleDelete(p.id)} title="Delete"><i className="fas fa-trash"></i></button></div></td>
+                            <td data-label="Product"><div className="admin-product-cell"><img src={p.image} alt={p.name} className="admin-product-thumb" /><div><strong>{p.name}</strong><span>{p.brand}</span></div></div></td>
+                            <td data-label="Category"><span className="admin-cat-pill">{p.category}</span></td>
+                            <td data-label="Price"><div className="admin-price-cell"><strong>{formatCurrency(p.price || 0)}</strong>{p.originalPrice && <s>{formatCurrency(p.originalPrice)}</s>}</div></td>
+                            <td data-label="Stock"><span className={`admin-stock-badge ${stockNum <= 0 ? 'empty' : stockNum < 10 ? 'low' : stockNum < 30 ? 'medium' : 'good'}`}>{stockNum}</span></td>
+                            <td data-label="Tags"><div className="admin-tag-pills">{p.isFlashSale && <span className="admin-tag flash"><i className="fas fa-bolt"></i></span>}{p.isTopSeller && <span className="admin-tag top"><i className="fas fa-fire"></i></span>}{p.isNewArrival && <span className="admin-tag new"><i className="fas fa-star"></i></span>}</div></td>
+                            <td data-label="Status"><span className={`admin-prod-status ${st}`}>{st === 'active' ? 'Active' : st === 'inactive' ? 'Inactive' : 'Out of Stock'}</span></td>
+                            <td data-label="Actions"><div className="admin-row-actions"><button className="admin-action-btn edit" onClick={() => startEdit(p)} title="Edit"><i className="fas fa-edit"></i></button><button className="admin-action-btn delete" onClick={() => handleDelete(p.id)} title="Delete"><i className="fas fa-trash"></i></button></div></td>
                           </tr>
                         );
                       })}
@@ -539,13 +539,13 @@ export default function AdminPage() {
                         const orderId = o._id || o.id;
                         return (
                           <tr key={orderId}>
-                            <td><strong>#{String(orderId).slice(-8)}</strong></td>
-                            <td><div className="admin-customer-cell"><div className="admin-customer-avatar">{customer[0].toUpperCase()}</div><div><strong>{customer}</strong><span>{email}</span></div></div></td>
-                            <td>{formatDate(o.createdAt || o.orderDate)}</td>
-                            <td><span className="admin-items-count">{(o.items || []).reduce((s, it) => s + (it.quantity || 1), 0)} items</span></td>
-                            <td><strong>{formatCurrency(o.total || 0)}</strong></td>
-                            <td><StatusBadge status={o.status || 'pending'} /></td>
-                            <td>
+                            <td data-label="Order"><strong>#{String(orderId).slice(-8)}</strong></td>
+                            <td data-label="Customer"><div className="admin-customer-cell"><div className="admin-customer-avatar">{customer[0].toUpperCase()}</div><div><strong>{customer}</strong><span>{email}</span></div></div></td>
+                            <td data-label="Date">{formatDate(o.createdAt || o.orderDate)}</td>
+                            <td data-label="Items"><span className="admin-items-count">{(o.items || []).reduce((s, it) => s + (it.quantity || 1), 0)} items</span></td>
+                            <td data-label="Total"><strong>{formatCurrency(o.total || 0)}</strong></td>
+                            <td data-label="Status"><StatusBadge status={o.status || 'pending'} /></td>
+                            <td data-label="Update">
                               <select className="admin-select admin-status-select" value={o.status || 'pending'} onChange={e => handleOrderStatus(o, e.target.value)}>
                                 {Object.entries(STATUS_META).map(([k, m]) => <option key={k} value={k}>{m.label}</option>)}
                               </select>
@@ -572,11 +572,11 @@ export default function AdminPage() {
                       {users.length === 0 && (<tr><td colSpan="5" className="admin-table-empty"><i className="fas fa-users"></i> No users yet</td></tr>)}
                       {users.map(u => (
                         <tr key={u._id || u.id || u.email}>
-                          <td><div className="admin-customer-cell"><div className="admin-customer-avatar" style={u.role === 'admin' ? { background: 'var(--accent-color)', color: 'var(--primary-color)' } : {}}>{(u.name || u.email || 'U')[0].toUpperCase()}</div><strong>{u.name || '—'}</strong></div></td>
-                          <td>{u.email || '—'}</td>
-                          <td><span className={`admin-role-badge ${u.role === 'admin' ? 'admin' : 'user'}`}>{u.role === 'admin' ? <><i className="fas fa-crown"></i> Admin</> : <><i className="fas fa-user"></i> User</>}</span></td>
-                          <td>{formatDate(u.createdAt || u.joinedDate)}</td>
-                          <td><span className="admin-prod-status active">Active</span></td>
+                          <td data-label="User"><div className="admin-customer-cell"><div className="admin-customer-avatar" style={u.role === 'admin' ? { background: 'var(--accent-color)', color: 'var(--primary-color)' } : {}}>{(u.name || u.email || 'U')[0].toUpperCase()}</div><strong>{u.name || '—'}</strong></div></td>
+                          <td data-label="Email">{u.email || '—'}</td>
+                          <td data-label="Role"><span className={`admin-role-badge ${u.role === 'admin' ? 'admin' : 'user'}`}>{u.role === 'admin' ? <><i className="fas fa-crown"></i> Admin</> : <><i className="fas fa-user"></i> User</>}</span></td>
+                          <td data-label="Joined">{formatDate(u.createdAt || u.joinedDate)}</td>
+                          <td data-label="Status"><span className="admin-prod-status active">Active</span></td>
                         </tr>
                       ))}
                     </tbody>
@@ -679,13 +679,13 @@ export default function AdminPage() {
                       {promoCodes.length === 0 && <tr><td colSpan="7" className="admin-table-empty">No promo codes yet</td></tr>}
                       {promoCodes.map((p, i) => (
                         <tr key={p.code}>
-                          <td><code style={{fontWeight:700,fontSize:'0.9rem'}}>{p.code}</code></td>
-                          <td><span className="admin-cat-pill">{p.type}</span></td>
-                          <td><strong>{p.type === 'percentage' ? p.value + '%' : p.type === 'fixed' ? formatCurrency(p.value) : 'Free'}</strong></td>
-                          <td>{p.minOrderValue > 0 ? formatCurrency(p.minOrderValue) : '—'}</td>
-                          <td style={{maxWidth:'200px',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{p.description}</td>
-                          <td><span className={`admin-prod-status ${p.active ? 'active' : 'inactive'}`}>{p.active ? 'Active' : 'Inactive'}</span></td>
-                          <td>
+                          <td data-label="Code"><code style={{fontWeight:700,fontSize:'0.9rem'}}>{p.code}</code></td>
+                          <td data-label="Type"><span className="admin-cat-pill">{p.type}</span></td>
+                          <td data-label="Value"><strong>{p.type === 'percentage' ? p.value + '%' : p.type === 'fixed' ? formatCurrency(p.value) : 'Free'}</strong></td>
+                          <td data-label="Min Order">{p.minOrderValue > 0 ? formatCurrency(p.minOrderValue) : '—'}</td>
+                          <td data-label="Description" style={{maxWidth:'200px',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{p.description}</td>
+                          <td data-label="Status"><span className={`admin-prod-status ${p.active ? 'active' : 'inactive'}`}>{p.active ? 'Active' : 'Inactive'}</span></td>
+                          <td data-label="Actions">
                             <div className="admin-row-actions">
                               <button className="admin-action-btn edit" onClick={() => { const next = promoCodes.map((c,j) => j===i ? {...c, active: !c.active} : c); savePromoCodes(next); setPromoCodes(next); }}><i className={p.active ? 'fas fa-pause' : 'fas fa-play'}></i></button>
                               <button className="admin-action-btn delete" onClick={() => { if (!confirm('Delete this promo code?')) return; const next = promoCodes.filter((_,j) => j!==i); savePromoCodes(next); setPromoCodes(next); showNotification('Promo code deleted', 'success'); }}><i className="fas fa-trash"></i></button>
@@ -704,7 +704,7 @@ export default function AdminPage() {
                     <thead><tr><th>Email</th><th>Subscribed</th></tr></thead>
                     <tbody>
                       {newsletter.length === 0 && <tr><td colSpan="2" className="admin-table-empty"><i className="fas fa-envelope"></i> No subscribers yet</td></tr>}
-                      {newsletter.map(s => (<tr key={s.email}><td>{s.email}</td><td>{new Date(s.subscribedAt).toLocaleDateString('en-GB', {day:'numeric',month:'short',year:'numeric'})}</td></tr>))}
+                      {newsletter.map(s => (<tr key={s.email}><td data-label="Email">{s.email}</td><td data-label="Subscribed">{new Date(s.subscribedAt).toLocaleDateString('en-GB', {day:'numeric',month:'short',year:'numeric'})}</td></tr>))}
                     </tbody>
                   </table>
                 </div>

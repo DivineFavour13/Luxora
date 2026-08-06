@@ -342,6 +342,14 @@
   box-shadow: var(--shadow-soft);
 }
 
+.brand-filter-toggle {
+  display: none;
+}
+
+.brand-toolbar-row2 {
+  display: contents;
+}
+
 @media (max-width: 1024px) {
   .brand-content {
     grid-template-columns: 1fr;
@@ -353,12 +361,113 @@
 }
 
 @media (max-width: 768px) {
+  .brand-content {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .brand-sidebar {
+    order: -1;
+  }
+
   .brand-hero-slider {
-    height: 190px;
+    height: 160px;
   }
 
   .brand-toolbar {
     grid-template-columns: 1fr;
+    gap: 0.6rem;
+  }
+
+  .brand-toolbar-row2 {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+  }
+
+  .brand-toolbar-row2 label {
+    flex-shrink: 0;
+  }
+
+  .brand-toolbar-row2 select {
+    flex: 1;
+    min-width: 0;
+  }
+
+  /* Filters become a collapsible panel */
+  .brand-filter-toggle {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+    background: var(--bg-primary);
+    border: 1px solid var(--border-color);
+    border-radius: 10px;
+    padding: 0.75rem 1rem;
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    cursor: pointer;
+    margin-bottom: 0.75rem;
+  }
+
+  .brand-filter-toggle i:first-child {
+    color: var(--accent-color);
+    margin-right: 0.4rem;
+  }
+
+  .brand-filter-panel {
+    display: none;
+  }
+
+  .brand-filter-panel.is-open {
+    display: flex;
+  }
+
+  /* Products grid: real 2-column layout instead of a single stretched column */
+  .brand-products-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 0.7rem;
+  }
+
+  .brand-product-image-link img {
+    height: 140px;
+  }
+
+  .brand-product-info {
+    padding: 0.6rem;
+    gap: 0.35rem;
+  }
+
+  .brand-product-info h4 {
+    font-size: 0.82rem;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
+  .brand-product-info p {
+    font-size: 0.72rem;
+  }
+
+  .brand-product-price strong {
+    font-size: 0.85rem;
+  }
+
+  .brand-product-price span {
+    font-size: 0.72rem;
+  }
+
+  .brand-product-info .btn-primary,
+  .brand-product-info .btn-secondary {
+    font-size: 0.75rem;
+    padding: 0.5rem 0.4rem;
+  }
+
+  .brand-card-wishlist {
+    width: 30px;
+    height: 30px;
   }
 }
 
@@ -498,6 +607,11 @@
 }
 
 @media (max-width: 600px) {
-  .brands-grid { grid-template-columns: 1fr 1fr; }
+  .brands-grid { grid-template-columns: 1fr 1fr; gap: 0.7rem; }
   .brands-page-header h1 { font-size: 1.5rem; }
+  .brand-card { padding: 0.8rem; gap: 0.6rem; }
+  .brand-card-logo { width: 38px; height: 38px; }
+  .brand-card-body h3 { font-size: 0.85rem; }
+  .brand-card-count { font-size: 0.72rem; }
+  .brands-count-badge { padding: 0.5rem 0.9rem; font-size: 0.8rem; }
 }

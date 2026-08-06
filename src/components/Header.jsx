@@ -7,6 +7,7 @@ import { findBrandByQuery, slugifyBrand } from '../utils/brands.js';
 export default function Header() {
   const [open, setOpen] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [mobileSearchOpen, setMobileSearchOpen] = useState(false);
   const [searchValue, setSearchValue] = useState('');
   const [user, setUser] = useState(() => getCurrentUser());
   const [cartCount, setCartCount] = useState(() => getCartItemCount());
@@ -67,6 +68,7 @@ export default function Header() {
     if (matchedBrand) {
       navigate(`/brand/${slugifyBrand(matchedBrand)}`);
       setSearchValue('');
+      setMobileSearchOpen(false);
       return;
     }
     const matched = products.filter(p =>
@@ -79,6 +81,7 @@ export default function Header() {
       navigate(`/search?q=${encodeURIComponent(query)}`);
     }
     setSearchValue('');
+    setMobileSearchOpen(false);
   };
 
   const navLinks = [
@@ -155,11 +158,36 @@ export default function Header() {
             </div>
           </div>
 
+          <button
+            className="mobile-search-btn"
+            onClick={() => setMobileSearchOpen(v => !v)}
+            aria-label="Toggle search"
+          >
+            <i className={mobileSearchOpen ? 'fas fa-times' : 'fas fa-search'}></i>
+          </button>
+
           <button className="mobile-menu-btn" onClick={() => setMobileMenuOpen(!mobileMenuOpen)} aria-label="Toggle menu">
             <i className={mobileMenuOpen ? 'fas fa-times' : 'fas fa-bars'}></i>
           </button>
         </nav>
       </div>
+
+      {mobileSearchOpen && (
+        <div className="mobile-search-row">
+          <i className="fas fa-search search-icon-prefix"></i>
+          <input
+            type="text"
+            autoFocus
+            placeholder="Search products, brands..."
+            value={searchValue}
+            onChange={(e) => setSearchValue(e.target.value)}
+            onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleSearch(); } }}
+          />
+          <button onClick={handleSearch} aria-label="Search">
+            <i className="fas fa-arrow-right"></i>
+          </button>
+        </div>
+      )}
 
       {mobileMenuOpen && (
         <div className="mobile-nav">
