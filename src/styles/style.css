@@ -2,6 +2,8 @@
 
 /* CSS Custom Properties (Variables) */
 :root {
+  color-scheme: light;
+
   /* ── Brand palette: Deep Ink + Champagne Gold ── */
   --primary-color: #1a1a2e;       /* deep ink navy */
   --primary-hover: #16213e;       /* slightly darker */

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { getProducts, addToCart, addToWishlist, removeFromWishlist, isInWishlist } from '../utils/storage.js';
 import { formatCurrency } from '../utils/format.js';
@@ -40,6 +40,14 @@ function formatCategoryLabel(category) {
     .replace(/\b\w/g, (char) => char.toUpperCase());
 }
 
+const SORT_OPTIONS = [
+  { value: 'featured', label: 'Featured' },
+  { value: 'latest', label: 'Latest' },
+  { value: 'rating', label: 'Top Rated' },
+  { value: 'price-asc', label: 'Price: Low to High' },
+  { value: 'price-desc', label: 'Price: High to Low' },
+];
+
 export default function BrandStorePage() {
   const { brandSlug } = useParams();
   const navigate = useNavigate();
@@ -53,6 +61,22 @@ export default function BrandStorePage() {
   const [selectedSport, setSelectedSport] = useState('all');
   const [, setWishlistVersion] = useState(0);
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
+  const [sortOpen, setSortOpen] = useState(false);
+  const sortRef = useRef(null);
+
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (sortRef.current && !sortRef.current.contains(event.target)) {
+        setSortOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    document.addEventListener('touchstart', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('touchstart', handleClickOutside);
+    };
+  }, []);
 
   const catalogProducts = useMemo(() => getProducts() || [], []);
   const brandName = useMemo(() => findBrandBySlug(catalogProducts, brandSlug), [catalogProducts, brandSlug]);
@@ -414,13 +438,31 @@ export default function BrandStorePage() {
                   />
                   Deals only
                 </label>
-                <select value={sortBy} onChange={(event) => setSortBy(event.target.value)}>
-                  <option value="featured">Featured</option>
-                  <option value="latest">Latest</option>
-                  <option value="rating">Top Rated</option>
-                  <option value="price-asc">Price: Low to High</option>
-                  <option value="price-desc">Price: High to Low</option>
-                </select>
+                <div className="brand-sort-dropdown" ref={sortRef}>
+                  <button
+                    type="button"
+                    className="brand-sort-trigger"
+                    onClick={() => setSortOpen(v => !v)}
+                  >
+                    <span>{SORT_OPTIONS.find(o => o.value === sortBy)?.label || 'Featured'}</span>
+                    <i className={`fas fa-chevron-${sortOpen ? 'up' : 'down'}`}></i>
+                  </button>
+                  {sortOpen && (
+                    <ul className="brand-sort-menu">
+                      {SORT_OPTIONS.map(opt => (
+                        <li key={opt.value}>
+                          <button
+                            type="button"
+                            className={opt.value === sortBy ? 'active' : ''}
+                            onClick={() => { setSortBy(opt.value); setSortOpen(false); }}
+                          >
+                            {opt.label}
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
               </div>
             </div>
 
