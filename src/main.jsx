@@ -25,7 +25,11 @@ initializeStorage();
 import('./utils/currency.js').then(({ ensureRates }) => ensureRates());
 
 // Fetch products from MongoDB and sync to localStorage
-fetch('http://localhost:3001/api/products')
+const API_BASE = import.meta.env.DEV
+  ? 'http://localhost:3001'
+  : 'https://luxora-7uwx.onrender.com';
+
+fetch(`${API_BASE}/api/products`)
   .then(r => r.json())
   .then(apiProducts => {
     if (Array.isArray(apiProducts) && apiProducts.length > 0) {

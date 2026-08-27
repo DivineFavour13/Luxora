@@ -1,4 +1,6 @@
 require('dotenv').config();
+const dns = require('dns');
+try { dns.setDefaultResultOrder('ipv4first'); } catch (_) { /* Node < 17, safe to ignore */ }
 const express = require('express');
 const cors = require('cors');
 const mongoose = require('mongoose');

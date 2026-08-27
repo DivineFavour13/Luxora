@@ -595,10 +595,10 @@ const products = [
     brand: "The Ordinary",
     rating: 4.6,
     reviews: 8921,
-    image: "/images/Niacinamide-10%-+-Zinc-1%-Serum.jpg",
+    image: "/images/niacinamide-zinc-serum.jpg",
     images: [
-      "/images/Niacinamide-10%-+-Zinc-1%-Serum2.jpg",
-      "/images/Niacinamide-10%-+-Zinc-1%-Serum3.jpg"
+      "/images/niacinamide-zinc-serum2.jpg",
+      "/images/niacinamide-zinc-serum3.jpg"
     ],
     description: "High-strength vitamin and mineral blemish formula. Reduces the appearance of blemishes and congestion.",
     features: ["10% Niacinamide", "1% Zinc PCA", "Reduces blemishes", "Minimises pore appearance"],
@@ -673,10 +673,10 @@ const products = [
     brand: "Giorgio Armani",
     rating: 4.9,
     reviews: 2341,
-    image: "/images/Acqua-di-Giò-Eau-de-Toilette.jpg",
+    image: "/images/acqua-di-gio-eau-de-toilette.jpg",
     images: [
-      "/images/Acqua-di-Giò-Eau-de-Toilette2.jpg",
-      "/images/Acqua-di-Giò-Eau-de-Toilette3.jpg"
+      "/images/acqua-di-gio-eau-de-toilette2.jpg",
+      "/images/acqua-di-gio-eau-de-toilette3.jpg"
     ],
     description: "An ode to the Mediterranean sea. Fresh citrus and marine notes blend with a warm base of cedarwood and patchouli.",
     features: ["Top: Bergamot, Neroli, Green Tangerine", "Heart: Marine notes, Rosemary", "Base: Cedar, Vetiver, Patchouli"],
